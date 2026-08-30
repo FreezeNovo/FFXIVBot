@@ -1,0 +1,21 @@
+[project]
+name = "ff14-qq-bot"
+version = "0.2.0"
+description = "独立运行的 FF14 QQ Bot"
+readme = "GOAL.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "nonebot-adapter-onebot>=2.4,<3",
+    "nonebot2[fastapi]>=2.4,<3",
+    "tzdata>=2025.2",
+    "uvicorn>=0.32,<1",
+]
+
+[dependency-groups]
+dev = [
+    "uv==0.12.4",
+]
+
+[tool.uv]
+package = false

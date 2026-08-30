@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>FINAL FANTASY XIV, The Lodestone</title>
+  <entry>
+    <title>Seasonal Event</title>
+    <link rel="alternate" href="https://example.invalid/lodestone/fixture" />
+    <id>tag:example.invalid,2026:/fixture</id>
+    <published>2026-08-14T09:10:00Z</published>
+    <updated>2026-08-14T10:10:00Z</updated>
+    <summary>Official summary</summary>
+    <category term="Topics" />
+  </entry>
+</feed>

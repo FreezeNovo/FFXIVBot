@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# 本地运行状态与连接配置不进入版本控制。
+data/
+logs/
+config.yaml
+.env
