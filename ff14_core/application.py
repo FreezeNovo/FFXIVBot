@@ -7,6 +7,8 @@ import logging
 from dataclasses import dataclass
 
 from .calendar import ActivityDigestWorkflow, CalendarQueryService
+from .news import AnnouncementWorkflow
+from .lodestone import LodestoneDetailService
 from .maintenance import MaintenanceQueryService, MaintenanceWorkflow
 from .config import AppConfig
 from .messaging import CommandRequest, CommandResult, OutboundMessage
@@ -30,6 +32,8 @@ class CoreApplication:
     digest_workflow: ActivityDigestWorkflow
     maintenance_workflow: MaintenanceWorkflow
     command_service: "CommandService"
+    announcement_workflow: AnnouncementWorkflow
+    lodestone_detail_service: LodestoneDetailService
 
     @classmethod
     def create(cls, config: AppConfig) -> "CoreApplication":
@@ -60,10 +64,13 @@ class CoreApplication:
             digest_workflow=digest_workflow,
             maintenance_workflow=maintenance_workflow,
             command_service=command_service,
+            announcement_workflow=AnnouncementWorkflow(store),
+            lodestone_detail_service=LodestoneDetailService(store),
         )
 
     def start(self) -> None:
         self.status_service.start()
+        self.store.recover_interrupted_deliveries()
 
 
 class CommandService:
@@ -87,19 +94,25 @@ class CommandService:
         self._maintenance_workflow = maintenance_workflow
 
     async def handle(self, request: CommandRequest) -> CommandResult:
-        if not self._status_service.is_target_enabled(request.target):
+        if request.target.target_type != "group" or not self._status_service.is_target_enabled(request.target):
             return CommandResult(handled=False)
 
         action = " ".join(request.text.strip().lower().split())
         if action in {"", "状态", "status"}:
+            if not self._is_owner(request):
+                return self._message("FF14 Bot：此诊断命令仅限 Bot 所有者使用。")
             return self._message(
                 self._status_service.render_status(request.target)
             )
 
         if action in {"活动", "activity", "日历", "calendar"}:
+            if not self._is_owner(request) and not self._status_service.can_query(request.target, "activity"):
+                return self._message("FF14 Bot：本群尚未开启普通群员活动查询。")
             return self._message(self._digest_workflow.preview(request.target))
 
         if action in {"维护", "maintenance"}:
+            if not self._is_owner(request) and not self._status_service.can_query(request.target, "maintenance"):
+                return self._message("FF14 Bot：本群尚未开启普通群员维护查询。")
             if self._maintenance_workflow is None:
                 return CommandResult(handled=False)
             return self._message(self._maintenance_workflow.preview(request.target))
@@ -185,7 +198,7 @@ class CommandService:
         return CommandResult(handled=False)
 
     def _is_owner(self, request: CommandRequest) -> bool:
-        return request.actor_role == "owner" or self._status_service.is_owner(
+        return self._status_service.is_owner(
             request.actor_id
         )
 

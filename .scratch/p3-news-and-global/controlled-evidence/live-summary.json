@@ -1,0 +1,133 @@
+{
+  "scope": "single explicitly authorized account and group; exact identifiers remain in ignored local authorization state",
+  "budget": {
+    "proactive": 8,
+    "replies": 2,
+    "total": 10
+  },
+  "actual": {
+    "all_test_connections_closed": true,
+    "runtime_lock_reacquired": true,
+    "production_schema_unchanged": "16",
+    "production_database_unchanged": true,
+    "test_schema": "22",
+    "send_calls": 8,
+    "proactive_messages": 6,
+    "group_command_replies": 2,
+    "provider_readbacks": 8,
+    "client_receipt_confirmed": true,
+    "isolated_owner_restored": true,
+    "isolated_group_restored": true,
+    "delivery_states": {
+      "sent": 5,
+      "superseded": 1,
+      "uncertain": 1
+    },
+    "attempt_outcomes": {
+      "sent": 5,
+      "uncertain": 1
+    },
+    "long_running_scheduler_left_active": false
+  },
+  "checks": {
+    "actual_nonebot_account_and_group_verified": true,
+    "offline_classification_without_send": true,
+    "actual_client_reconnected": true,
+    "incoming_listener_ready": true,
+    "announcement_dispatch_0": 1,
+    "announcement_two_region_source_samples_acknowledged": true,
+    "announcement_dispatch_1": 1,
+    "activity_digest_dispatch_2": 2,
+    "digest_same_day_dedup": true,
+    "maintenance_dispatch_4": 1,
+    "simulated_lost_confirmation_after_provider_ack": true,
+    "maintenance_dispatch_5": 1,
+    "uncertain_never_retried": true,
+    "disabled_subscription_stops_pending_send": true,
+    "application_service_restart_retains_sent_and_unknown": true,
+    "automated_live_cases_complete": true,
+    "actual_private_event_processed_without_reply": true,
+    "isolated_ledger_integrity": true,
+    "test_adapter_connections_closed": true,
+    "production_database_unchanged": true,
+    "background_scheduled_jobs_absent": true,
+    "corrected_incoming_receiver_ready": true,
+    "actual_owner_command_reply": true,
+    "actual_private_event_with_production_prefix_silent": true,
+    "actual_nonowner_diagnostic_denied": true,
+    "receiver_ledger_integrity": true,
+    "disabled_group_reply_path_not_called": true,
+    "actual_disabled_group_command_unhandled": true
+  },
+  "started_at": "2026-11-05T14:16:24.116465+00:00",
+  "ended_at": "2026-11-05T14:39:28.743468+00:00",
+  "source_contracts": {
+    "discovery": [
+      {
+        "source": "china_news_api",
+        "success": true,
+        "documents": 20,
+        "error": null
+      },
+      {
+        "source": "lodestone_atom",
+        "success": true,
+        "documents": 20,
+        "error": null
+      },
+      {
+        "source": "lodestone_topics",
+        "success": true,
+        "documents": 20,
+        "error": null
+      }
+    ],
+    "candidates": {
+      "china_news_api": 1,
+      "lodestone_atom": 8,
+      "lodestone_topics": 6
+    },
+    "active_activity_candidates": {
+      "china_news_api": 1,
+      "lodestone_atom": 0,
+      "lodestone_topics": 4
+    },
+    "public_http_requests": 9,
+    "body_versions": 43,
+    "direct_body_contracts": [
+      {
+        "source": "lodestone_topics",
+        "body_contract_success": true
+      },
+      {
+        "source": "lodestone_atom",
+        "body_contract_success": true
+      }
+    ],
+    "extra_header_diagnostic_request": true
+  },
+  "remote_after": {
+    "QqRunning": true,
+    "NapCatRunning": true,
+    "FfxivGatewayCount": 0,
+    "OriginalNapCatProcessesStillPresent": true
+  },
+  "human_confirmation": {
+    "confirmed_at": "2026-11-05T14:37:29.512050+00:00",
+    "owner_group_status_visible": true,
+    "private_command_silent": true,
+    "nonowner_diagnostic_rejected": true,
+    "all_test_messages_visible_in_group_client": true,
+    "nonowner_actor_mode": "same_real_account_with_isolated_owner_temporarily_cleared",
+    "independent_second_human_actor_available": false,
+    "disabled_group_silence_confirmed": true
+  },
+  "role_configuration_restored": true,
+  "limitations": [
+    "nonowner matrix uses the same real QQ with isolated Bot owner configuration temporarily removed; no independent human member account",
+    "maintenance is a labelled historical replay; announcement edit and lost application confirmation are explicitly simulated",
+    "normal production startup, production database upgrade, force-kill/long-outage and long-running scheduled operations were not performed"
+  ],
+  "diagnostic_tool_correction": "initial temporary receiver omitted production command_start; receiver-only restart corrected it without replaying proactive messages",
+  "deadline_at": "2026-11-05T14:46:24.116459+00:00"
+}

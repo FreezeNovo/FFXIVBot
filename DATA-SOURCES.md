@@ -1,6 +1,6 @@
 # FFXIVBot 数据源契约
 
-状态：当前数据源边界，更新于 2026-08-15。产品目标见 [`GOAL.md`](GOAL.md)，模块与存储设计见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+状态：当前数据源边界，文档更新于 2026-11-04。本次已对国服与NA公开接口重新作有界只读核验，证据见文末。产品目标见 [`GOAL.md`](GOAL.md)，模块与存储设计见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
 
 本文只记录上游能提供什么、哪些字段可信、如何判断退化。消息策略、群配置和技术栈不在这里重复定义。
 
@@ -22,22 +22,22 @@
 ```text
 https://na.finalfantasyxiv.com/lodestone/news/
 https://na.finalfantasyxiv.com/lodestone/news/news.xml
-https://na.finalfantasyxiv.com/lodestone/topics.xml
+https://na.finalfantasyxiv.com/lodestone/news/topics.xml
 ```
 
-`news.xml` 是首选机器发现入口。已观察到的 Atom 字段包括稳定文章 ID/URL、标题、分类、UTC `published`/`updated`、HTML 内容、链接和图片。这些字段适合文章发现和版本判断，不构成原生活动 schema。
+`news.xml` 与 `/lodestone/news/topics.xml` 分别发现普通新闻和Topics。已观察到的 Atom 字段包括稳定文章 ID/URL、标题、分类、UTC `published`/`updated`、HTML 内容、链接和图片。这些字段适合文章发现和版本判断，不构成原生活动 schema。
 
-调查时 `topics.xml` 与 `news.xml` 返回相同 feed 身份和内容。在契约测试证明它能提供独立内容前，不能把它作为第二个来源，否则会制造重复文章。
+历史调查中的 `topics.xml` 路径不准确；2026-11-04 实测的独立Topics入口、稳定身份与覆盖限制见文末复核，不能沿用旧的“同一feed”判断。
 
 ### 正文提取
 
-1. 按 Atom ID 和内容 hash 发现新增或实质更新的文章；
+1. 按 Atom ID 识别文章身份，使用内容 hash 检测所覆盖内容的版本变化；hash 变化不代表语义上发生实质更新；
 2. 保存原始 HTML，再生成用于分类和时间解析的规范文本；
 3. 识别正文中的 `Date & Time`、日期范围和明确时区，保留原始时区文本与 IANA 时区换算假设；
 4. 允许一篇文章生成零到多个活动断言；仅有日期时保留 `day` 精度，不伪造小时；
 5. Maintenance 进入独立维护流，Topics/Notices 等上游分类只用于路由，不能单独证明存在可提醒活动。
 
-轮询应使用条件请求（上游支持时）、标识性 User-Agent、超时和带抖动退避。建议初始周期约 15 分钟；它是运维默认值，不是上游 SLA。
+轮询应使用条件请求（上游支持时）、标识性 User-Agent、超时和带抖动退避。检查周期见 [产品规则](GOAL.md#1-官方资讯订阅)，不代表上游 SLA。
 
 ## 国服官方新闻中心
 
@@ -64,7 +64,7 @@ GET https://cqnews.web.sdo.com/api/news/newsDetail?gameCode=ff&id=ARTICLE_ID
 
 ### 抓取与时间规则
 
-- 列表从最新页向后扫描，直到越过已知 ID/hash 和安全回溯窗口；当前 PoC 的 5 页上限只是实现限制，不是目标契约。
+- 当前列表读取前5页，保留已发现文章，不以一次窗口穷尽历史；置顶与服务端页大小行为见本次复核。5页是当前有界实现，不是上游契约或完整回溯保证。
 - 新增或变化的文档抓取详情；仍在进行或未来结束的长周期活动必须另行定期复查，不能只看最新 N 篇。
 - 国服无明确说明的日期按 `Asia/Shanghai` 解释；原文中的其他时区优先。
 - parser 需要覆盖 `至`、`~`、`-`、省略年份、`24点` 和一文多活动，并对跨年补全年份保持保守。
@@ -117,3 +117,22 @@ Universalis 数据由玩家上传，不是官方实时数据。按其当前公�
 Universalis 接受物品 ID，不提供本项目需要的中文名称搜索。中文名、别名和消歧由版本化的本地 `ItemCatalogProvider` 提供；数据来源、许可和更新周期尚待确定。
 
 检索顺序应为规范化后的精确名称、别名、前缀/词元包含、模糊相似度。多个候选或低置信度时返回消歧列表，不能擅自选中物品。
+
+## P3 契约复核（2026-11-04 实测）
+
+通过带标识 User-Agent 的有界只读 GET 核验，原始最小样本和请求说明见 [fixture 清单](tests/fixtures/p3/README.md)。这是本次实测，与前文历史观察分开：
+
+- 国服列表/详情仍为上述 JSON 形态。pageSize=3 实际返回5条；pageIndex=1返回下一组5条，PageCount=132、TotalCount=657。存在置顶文章，不保证发布时间递减；有限5页扫描只覆盖最近窗口及置顶条目，不能证明穷尽停机期间文章。Id稳定，CategoryCode保留原代码。PublishDate为无offset的北京时间；没有可信更新时间字段。
+- NA `news.xml` 本次20篇，分类 Notices/Maintenance 等，含转义的完整HTML content。官网另外声明 **`https://na.finalfantasyxiv.com/lodestone/news/topics.xml`**，此入口返回独立Topics Atom feed（本次20篇）。旧 `/lodestone/topics.xml` 本次返回HTML错误页，不能作为feed。必须同时发现新闻与Topics，按entry稳定Atom ID及逐篇内容比较。
+- NA entry的published/updated带Z；本次二者相同，不能推断旧文修改必然重新进入feed。有限feed没有分页或完整历史承诺。news/detail 与 topics/detail 的官方链接可直接GET复查；仅取 news__detail__wrapper 正文，排除导航、脚本与社区内容。
+- NA正文有明确PST/PDT，也有仅日期、around、until the end of the performance、缺年或无结束时刻。PST/PDT按明确固定offset解释（-08/-07），不依赖主机时区；仅日期保留day精度，不产生精确维护提醒；不确定区间只保留文章。不能按发布时间补活动起点。
+- 这些响应为200，本次未见ETag/Last-Modified；未实测304。保留离线304验证但不宣称接口一定支持。空/缺字段、HTML替代XML、部分分页失败都视为退化并保留旧数据。
+- 列表/Atom不保证披露旧文修改，已知活跃文章需直接正文复查；未入扫描窗口且未曾发现的旧文章、同一图片URL下字节变化都存在观测盲区。公开接口可访问不等于SLA。
+
+当前 NA parser 为 `na-time-v1`，只接受已记录标签下的明确起止区间；时间型使用UTC持久化，保留原始PST/PDT与补年假设。只有日期的范围另存 day 精度证据，不转换为精确提醒。详情304要求实际发出逐篇条件头，并与已保存内容版本对应；列表304不刷新活动核实时间。
+
+## P3 受控复核（2026-11-05）
+
+任务12通过既有HTTP transport对国服列表、NA新闻/Topics各作一次发现，并直接复核国服详情与NA活动、维护正文；各列表返回20篇，含标题诊断共9次逻辑GET调用（底层有限重试不能折算为相同数量的实际网络请求）。本次抽样与上述契约相符，不增加历史覆盖或可用性承诺；未观察304，不能声称已在线验证条件响应。计数及范围见 [受控报告](.scratch/p3-news-and-global/controlled-acceptance.md)。
+
+Topics详情包含独立的 `<h1 class="heading__title">Topics</h1>` 栏目标题，后面另有文章h1。正文parser排除该栏目h1并为文章h1重新收集标题，避免将页面导航拼入官方标题并误报更新。公开最小样本及采集说明见 [fixture清单](tests/fixtures/p3/README.md)，修复前失败的离线回归见 `tests/test_p3_live_findings.py`。该补充不扩大时间解析形态或改变稳定来源身份。

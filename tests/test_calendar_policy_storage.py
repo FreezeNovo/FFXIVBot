@@ -12,7 +12,7 @@ from ff14_core.source_models import (
     EventCandidate,
     SourceDocument,
 )
-from ff14_core.storage import StateStore
+from ff14_core.storage import StateStore, SCHEMA_VERSION
 
 
 class CalendarPolicyStorageTests(unittest.TestCase):
@@ -88,8 +88,8 @@ class CalendarPolicyStorageTests(unittest.TestCase):
             ).fetchone()[0]
             connection.close()
             self.assertEqual(statuses, {"n-failed": "failed", "n-old": "superseded"})
-            self.assertIn("ON DELETE CASCADE", delivery_fk.upper())
-            self.assertEqual(store.get_meta("schema_version"), "15")
+            self.assertNotIn("ON DELETE CASCADE", delivery_fk.upper())
+            self.assertEqual(store.get_meta("schema_version"), SCHEMA_VERSION)
 
     def test_old_upcoming_window_is_migrated_to_seven_days(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -145,7 +145,7 @@ class CalendarPolicyStorageTests(unittest.TestCase):
             self.assertTrue(policy.notify_announcements)
             self.assertEqual(policy.reminder_window_minutes, 360)
             self.assertFalse(policy.notify_updates)
-            self.assertEqual(StateStore(database).get_meta("schema_version"), "15")
+            self.assertEqual(StateStore(database).get_meta("schema_version"), SCHEMA_VERSION)
 
     def test_category_policy_controls_calendar_and_preserves_review_page(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

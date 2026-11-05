@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -176,6 +177,85 @@ class MaintenanceWorkflowTests(unittest.TestCase):
         pending = store.list_pending_notifications(stream="maintenance")
         self.assertIn("维护即将开始", pending[0][2])
         self.assertNotIn("发现新的维护公告", pending[0][2])
+
+    def test_early_announcement_does_not_suppress_later_reminder(self):
+        temporary, store, target = self._store()
+        self.addCleanup(temporary.cleanup)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self._record_maintenance(store, start=now + timedelta(hours=48))
+        workflow = MaintenanceWorkflow(store, MaintenanceQueryService(store))
+        port = FakeMaintenanceMessaging()
+        self.assertEqual(asyncio.run(workflow.tick(port, now=now)), 1)
+        self.assertEqual(asyncio.run(workflow.tick(port, now=now + timedelta(hours=25))), 1)
+        self.assertIn('维护即将开始', port.sent[-1])
+
+    def test_pending_reminder_is_not_sent_after_maintenance_starts(self):
+        temporary, store, target = self._store()
+        self.addCleanup(temporary.cleanup)
+        store.set_maintenance_policy(target.target_id, MaintenancePolicy(enabled=True, notify_announcements=False))
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self._record_maintenance(store, start=now + timedelta(hours=2))
+        workflow = MaintenanceWorkflow(store, MaintenanceQueryService(store))
+        workflow.plan_due(now=now)
+        port = FakeMaintenanceMessaging()
+        asyncio.run(workflow.tick(port, now=now + timedelta(hours=3)))
+        self.assertEqual(port.sent, [])
+
+    def test_planner_interruption_after_observation_does_not_lose_announcement(self):
+        temporary, store, target = self._store()
+        self.addCleanup(temporary.cleanup)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self._record_maintenance(store, start=now + timedelta(hours=48))
+        candidate = store.get_maintenance_candidates()[0].candidate
+        store.observe_maintenance_candidate(target_id=target.target_id, candidate=candidate,
+            watermark_at=store.get_maintenance_policy(target.target_id).watermark_at)
+        # Equivalent to interruption after observation commits, before candidate creation.
+        restarted = MaintenanceWorkflow(store, MaintenanceQueryService(store))
+        self.assertEqual(restarted.plan_due(now=now), 1)
+        self.assertIn('发现新的维护公告', store.list_pending_notifications()[0][2])
+
+    def test_delayed_announcement_covers_near_start_reminder(self):
+        temporary, store, target = self._store()
+        self.addCleanup(temporary.cleanup)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self._record_maintenance(store, start=now + timedelta(hours=48))
+        workflow = MaintenanceWorkflow(store, MaintenanceQueryService(store))
+        workflow.plan_due(now=now)
+        port = FakeMaintenanceMessaging()
+        asyncio.run(workflow.tick(port, now=now + timedelta(hours=25)))
+        self.assertEqual(len(port.sent), 1)
+        self.assertIn('发现新的维护公告', port.sent[0])
+        self.assertEqual(workflow.plan_due(now=now + timedelta(hours=26)), 0)
+
+    def test_rejected_announcement_does_not_suppress_independent_reminder(self):
+        temporary, store, target = self._store()
+        self.addCleanup(temporary.cleanup)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self._record_maintenance(store, start=now + timedelta(hours=2))
+        workflow = MaintenanceWorkflow(store, MaintenanceQueryService(store))
+        class Rejected:
+            async def send_proactive(self, target, message):
+                return SendResult(success=False, retryable=False, error='fixture rejection')
+        asyncio.run(workflow.tick(Rejected(), now=now))
+        port = FakeMaintenanceMessaging()
+        asyncio.run(workflow.tick(port, now=now + timedelta(minutes=1)))
+        self.assertEqual(len(port.sent), 1)
+        self.assertIn('维护即将开始', port.sent[0])
+
+    def test_parser_revision_without_time_change_does_not_repeat_notice(self):
+        temporary, store, target = self._store()
+        self.addCleanup(temporary.cleanup)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self._record_maintenance(store, start=now + timedelta(hours=2))
+        workflow = MaintenanceWorkflow(store, MaintenanceQueryService(store))
+        port = FakeMaintenanceMessaging()
+        asyncio.run(workflow.tick(port, now=now))
+        item = store.get_maintenance_candidates()[0]
+        store.record_china_detail_success(
+            ChinaNewsDetail('china_news_api', 'maintenance-1', '全区维护公告', None, '<p>same times</p>', 'same times'),
+            (replace(item, candidate=replace(item.candidate, candidate_id='parser-revision-2')),), 'parser-revision-2')
+        asyncio.run(workflow.tick(port, now=now))
+        self.assertEqual(len(port.sent), 1)
 
 
 if __name__ == "__main__":

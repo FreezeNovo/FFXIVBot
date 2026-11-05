@@ -1,6 +1,6 @@
 # FFXIVBot 迁移与清理记录
 
-状态：NoneBot2 迁移已完成，更新于 2026-08-24。实施顺序见 [`TODO.md`](TODO.md)，目标边界见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+状态：NoneBot2 迁移已完成，更新于 2026-11-04。实施顺序见 [`TODO.md`](TODO.md)，目标边界见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
 
 ## 当前运行边界
 
@@ -11,9 +11,21 @@ NapCat -> NoneBot2 + FastAPI ASGI -> qq_nonebot -> Core / SQLite
                               -> WebUI (/、/access)
 ```
 
-统一入口为 `scripts/start-nonebot-dev.ps1`；WebUI、Core、来源轮询、活动摘要和国服维护提醒调度与 NoneBot 在同一进程中启动和停止。
+Windows/Linux 统一入口见 [`UV-USAGE.md`](UV-USAGE.md)；WebUI、Core、来源轮询、活动摘要和国服维护提醒调度与 NoneBot 在同一进程中启动和停止。
 
 旧 QQ 网关已彻底移除，不保留兼容入口或回退运行时。NapCat 仍是外部 provider，本项目不安装、登录、重配或停止 NapCat。
+
+## 当前可靠性升级
+
+2026-11-02 的修复未变更 QQ 运行时；随后经用户授权完成正式数据库升级，并将后续开发与验收切换到 Linux，执行证据见 [`TODO.md`](TODO.md#linux-开发切换与正式数据库升级2026-11-02)。投递账本升级到 schema 16，备份、只读副本预演和恢复步骤见 [`UV-USAGE.md`](UV-USAGE.md#schema-16-升级与恢复)；群查询授权与未知结果处理见 [`WEBUI.md`](WEBUI.md)。离线验证范围和剩余真实环境验收见 [`TODO.md`](TODO.md#可靠性与权限修复2026-11-02)。
+
+## P3 升级与受控验收
+
+P3增量不改变QQ运行时；当前代码schema 22的副本迁移与恢复流程见 [UV-USAGE](UV-USAGE.md#p3-schema-22-升级与恢复)，离线证据见 [验收报告](.scratch/p3-news-and-global/offline-acceptance.md)。2026-11-05任务12已获授权并完成 [受控真实验收](.scratch/p3-news-and-global/controlled-acceptance.md)，使用隔离验收库及正式库的迁移预演副本；正式库仍为schema16，正式升级和部署未执行。
+
+## Linux 真实环境复验
+
+2026-11-03 已经用户授权，通过 SSH 核查既有 Windows NapCat，并完成 Linux 的实际 NoneBot 连接、断开/重连、单条受限群发送与 provider 读回。没有启动日常调度、修改 provider 或运行第二套正式网关。脱敏证据与未覆盖的入站/长期运行边界见 [`TODO.md`](TODO.md#napcat-真实链路验证2026-11-03)。
 
 ## 已完成的清理
 

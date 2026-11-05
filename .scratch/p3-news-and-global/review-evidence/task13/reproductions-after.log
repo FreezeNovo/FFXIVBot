@@ -1,0 +1,5 @@
+recent change to expired initial announcement: expected 1, actual 1
+unchanged frozen article deliveries: expected 1, actual 1
+{'china_news_api': 114, 'lodestone_atom': 3, 'lodestone_topics': 3}
+body contains Event Period: expected True, actual True
+accepted as complete nonempty wrapper: True

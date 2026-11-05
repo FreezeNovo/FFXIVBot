@@ -1,0 +1,137 @@
+test_frozen_page_format_change_does_not_duplicate_its_article (test_p3_review_corrections.AnnouncementReviewTests.test_frozen_page_format_change_does_not_duplicate_its_article) ... FAIL
+test_frozen_real_change_is_a_successor_after_original_confirmation (test_p3_review_corrections.AnnouncementReviewTests.test_frozen_real_change_is_a_successor_after_original_confirmation) ... FAIL
+test_real_update_after_expired_first_publication_uses_observation_time (test_p3_review_corrections.AnnouncementReviewTests.test_real_update_after_expired_first_publication_uses_observation_time) ... 
+  test_real_update_after_expired_first_publication_uses_observation_time (test_p3_review_corrections.AnnouncementReviewTests.test_real_update_after_expired_first_publication_uses_observation_time) (expired_in_prior_wake=True) ... FAIL
+  test_real_update_after_expired_first_publication_uses_observation_time (test_p3_review_corrections.AnnouncementReviewTests.test_real_update_after_expired_first_publication_uses_observation_time) (expired_in_prior_wake=False) ... FAIL
+test_update_merge_and_retry_do_not_extend_one_eligibility_window (test_p3_review_corrections.AnnouncementReviewTests.test_update_merge_and_retry_do_not_extend_one_eligibility_window) ... FAIL
+test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) ... 
+  test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png">', br='<br />') ... FAIL
+  test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png">', br='<br></br>') ... FAIL
+  test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png" />', br='<br>') ... FAIL
+  test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png" />', br='<br />') ... FAIL
+  test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png" />', br='<br></br>') ... FAIL
+test_failing_cn_backlog_does_not_starve_na_first_or_known_details (test_p3_review_corrections.ReviewFairnessTests.test_failing_cn_backlog_does_not_starve_na_first_or_known_details) ... FAIL
+test_saturated_and_single_source_queues_keep_one_total_budget (test_p3_review_corrections.ReviewFairnessTests.test_saturated_and_single_source_queues_keep_one_total_budget) ... 
+  test_saturated_and_single_source_queues_keep_one_total_budget (test_p3_review_corrections.ReviewFairnessTests.test_saturated_and_single_source_queues_keep_one_total_budget) (sizes=(40, 40, 40)) ... FAIL
+
+======================================================================
+FAIL: test_frozen_page_format_change_does_not_duplicate_its_article (test_p3_review_corrections.AnnouncementReviewTests.test_frozen_page_format_change_does_not_duplicate_its_article)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 177, in test_frozen_page_format_change_does_not_duplicate_its_article
+    self.assertEqual(sum(version.url in message for _, message in self.messaging.sent), 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 1
+
+======================================================================
+FAIL: test_frozen_real_change_is_a_successor_after_original_confirmation (test_p3_review_corrections.AnnouncementReviewTests.test_frozen_real_change_is_a_successor_after_original_confirmation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 189, in test_frozen_real_change_is_a_successor_after_original_confirmation
+    self.assertEqual(successor[0], observed.isoformat())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '2026-11-04T12:00:01+00:00' != '2026-11-04T12:00:04+00:00'
+- 2026-11-04T12:00:01+00:00
+?                   ^
++ 2026-11-04T12:00:04+00:00
+?                   ^
+
+
+======================================================================
+FAIL: test_real_update_after_expired_first_publication_uses_observation_time (test_p3_review_corrections.AnnouncementReviewTests.test_real_update_after_expired_first_publication_uses_observation_time) (expired_in_prior_wake=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 129, in test_real_update_after_expired_first_publication_uses_observation_time
+    self.assertEqual(self.tick(observed + timedelta(seconds=1)), 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_real_update_after_expired_first_publication_uses_observation_time (test_p3_review_corrections.AnnouncementReviewTests.test_real_update_after_expired_first_publication_uses_observation_time) (expired_in_prior_wake=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 129, in test_real_update_after_expired_first_publication_uses_observation_time
+    self.assertEqual(self.tick(observed + timedelta(seconds=1)), 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_update_merge_and_retry_do_not_extend_one_eligibility_window (test_p3_review_corrections.AnnouncementReviewTests.test_update_merge_and_retry_do_not_extend_one_eligibility_window)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 149, in test_update_merge_and_retry_do_not_extend_one_eligibility_window
+    self.assertEqual(self.tick(observed + timedelta(hours=74)), 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png">', br='<br />')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 96, in test_equivalent_void_syntax_preserves_body_candidates_and_comparison
+    self.assertIn('Event Period', parser.body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Event Period' not found in '<img src="fixture.png"><br />'
+
+======================================================================
+FAIL: test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png">', br='<br></br>')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 96, in test_equivalent_void_syntax_preserves_body_candidates_and_comparison
+    self.assertIn('Event Period', parser.body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Event Period' not found in '<img src="fixture.png"><br>'
+
+======================================================================
+FAIL: test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png" />', br='<br>')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 96, in test_equivalent_void_syntax_preserves_body_candidates_and_comparison
+    self.assertIn('Event Period', parser.body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Event Period' not found in '<img src="fixture.png" />'
+
+======================================================================
+FAIL: test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png" />', br='<br />')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 96, in test_equivalent_void_syntax_preserves_body_candidates_and_comparison
+    self.assertIn('Event Period', parser.body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Event Period' not found in '<img src="fixture.png" />'
+
+======================================================================
+FAIL: test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) (image='<img src="fixture.png" />', br='<br></br>')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 96, in test_equivalent_void_syntax_preserves_body_candidates_and_comparison
+    self.assertIn('Event Period', parser.body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Event Period' not found in '<img src="fixture.png" />'
+
+======================================================================
+FAIL: test_failing_cn_backlog_does_not_starve_na_first_or_known_details (test_p3_review_corrections.ReviewFairnessTests.test_failing_cn_backlog_does_not_starve_na_first_or_known_details)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 63, in test_failing_cn_backlog_does_not_starve_na_first_or_known_details
+    self.assertEqual({identity for source, identity in calls if source == 'lodestone_atom'}, {'0', '1'})
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Items in the second set but not the first:
+'1'
+'0'
+
+======================================================================
+FAIL: test_saturated_and_single_source_queues_keep_one_total_budget (test_p3_review_corrections.ReviewFairnessTests.test_saturated_and_single_source_queues_keep_one_total_budget) (sizes=(40, 40, 40))
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_review_corrections.py", line 77, in test_saturated_and_single_source_queues_keep_one_total_budget
+    self.assertEqual(set(counts), set(SOURCES))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Items in the second set but not the first:
+'lodestone_atom'
+'lodestone_topics'
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.086s
+
+FAILED (failures=12)

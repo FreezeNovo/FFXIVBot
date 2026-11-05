@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Iterator
 from uuid import uuid4
 
-from .messaging import TargetRef
+from .messaging import TargetRef, SendResult
 from .source_models import (
     CalendarCategoryOption,
     CalendarEntry,
@@ -21,12 +21,14 @@ from .source_models import (
     EventCandidate,
     ActivityDigestPolicy,
     MaintenancePolicy,
+    MaintenanceObservation,
+    ManualQueryPolicy,
     ReviewPage,
     SourceDocument,
     SourceHealth,
 )
 
-SCHEMA_VERSION = "15"
+SCHEMA_VERSION = "22"
 MIN_UPCOMING_WINDOW_MINUTES = 7 * 24 * 60
 
 
@@ -49,7 +51,28 @@ class ManagedTarget:
     enabled: bool
 
 
-class StateStore:
+@dataclass(frozen=True)
+class DeliveryClaim:
+    attempt_id: int
+    target: TargetRef
+    message_text: str
+
+
+@dataclass(frozen=True)
+class DeliveryRecord:
+    notification_id: str
+    target_name: str
+    stream: str
+    status: str
+    message_text: str
+    last_error: str | None
+    attempts: int
+
+
+from .p3_storage import P3StoreMethods, migrate_p3
+
+
+class StateStore(P3StoreMethods):
     """保存应用状态和稳定投递目标。"""
 
     def __init__(self, database_path: Path) -> None:
@@ -60,7 +83,14 @@ class StateStore:
         now = utc_now_text()
         if self._database_path.exists() and self._database_path.stat().st_size:
             previous_version = self._read_schema_version()
+            if previous_version is not None and int(previous_version) > int(SCHEMA_VERSION):
+                raise ValueError("数据库来自较新版本，禁止自动降级")
             if previous_version != SCHEMA_VERSION:
+                versioned_backup = self._database_path.with_name(
+                    self._database_path.name + f".pre-v{int(previous_version) if previous_version else 0}-to-v{SCHEMA_VERSION}.bak"
+                )
+                if not versioned_backup.exists():
+                    self.backup_to(versioned_backup)
                 backup_path = self._database_path.with_name(
                     self._database_path.name + ".pre-migration.bak"
                 )
@@ -249,7 +279,16 @@ class StateStore:
                 );
                 """
             )
+            migrate_p3(connection, self._ensure_column, target_version=int(SCHEMA_VERSION))
             self._ensure_notification_status_schema(connection)
+            self._ensure_column(connection, "notification_candidate", "retirement_code", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(connection, "maintenance_observation", "notification_kind", "TEXT NOT NULL DEFAULT ''")
+            for column in ("archived", "activity_query_enabled", "maintenance_query_enabled"):
+                self._ensure_column(connection, "target", column, "INTEGER NOT NULL DEFAULT 0")
+            connection.execute("CREATE TABLE IF NOT EXISTS delivery_review ("
+                               "review_id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                               "notification_id TEXT NOT NULL REFERENCES notification_candidate(notification_id), "
+                               "reviewed_at TEXT NOT NULL, decision TEXT NOT NULL)")
             self._ensure_column(
                 connection,
                 "event_candidate",
@@ -304,7 +343,7 @@ class StateStore:
             connection.execute(
                 "UPDATE activity_digest_policy SET upcoming_window_minutes = ? "
                 "WHERE upcoming_window_minutes > 0 AND upcoming_window_minutes < ?",
-                (MIN_UPCOMING_WINDOW_MINUTES, MIN_UPCOMING_WINDOW_MINUTES),
+                (MIN_UPCOMING_WINDOW_MINUTES, MIN_UPCOMING_WINDOW_MINUTES if self._read_schema_version() not in {"16","17","18","19","20","21","22"} else 0),
             )
             self._ensure_column(
                 connection,
@@ -415,7 +454,7 @@ class StateStore:
         with self._connection() as connection:
             rows = connection.execute(
                 "SELECT target_id, provider, target_type, provider_target_id, display_name, enabled "
-                "FROM target ORDER BY provider, target_type, provider_target_id"
+                "FROM target WHERE archived = 0 ORDER BY provider, target_type, provider_target_id"
             ).fetchall()
         return tuple(
             ManagedTarget(
@@ -438,7 +477,7 @@ class StateStore:
             connection.execute(
                 "INSERT INTO target(target_id, provider, target_type, provider_target_id, "
                 "display_name, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
-                "ON CONFLICT(target_id) DO UPDATE SET enabled = excluded.enabled, "
+                "ON CONFLICT(target_id) DO UPDATE SET enabled = excluded.enabled, archived = 0, "
                 "updated_at = excluded.updated_at",
                 (
                     target.target_id,
@@ -451,15 +490,53 @@ class StateStore:
                     now,
                 ),
             )
+            if not enabled:
+                self._supersede_pending(connection, target.target_id, reason="服务群已停用", reason_code="target_disabled")
         return target
+
+    @staticmethod
+    def _supersede_pending(connection, target_id, *, stream=None, reason, reason_code="policy_disabled"):
+        connection.execute(
+            "UPDATE notification_candidate SET status = CASE WHEN status = 'pending' THEN 'superseded' ELSE status END, "
+            "retirement_code = ?, last_error = ?, updated_at = ? "
+            "WHERE target_id = ? AND status IN ('pending', 'sending')" + (" AND stream = ?" if stream else ""),
+            (reason_code, reason, utc_now_text(), target_id) + ((stream,) if stream else ()),
+        )
 
     def delete_onebot_group(self, group_id: str) -> bool:
         target = TargetRef.for_onebot_group(group_id)
         with self._connection() as connection:
             cursor = connection.execute(
-                "DELETE FROM target WHERE target_id = ?", (target.target_id,)
+                "UPDATE target SET archived = 1, enabled = 0, activity_query_enabled = 0, "
+                "maintenance_query_enabled = 0, updated_at = ? WHERE target_id = ? AND archived = 0",
+                (utc_now_text(), target.target_id),
             )
-        return cursor.rowcount == 1
+            changed = cursor.rowcount == 1
+            if changed:
+                self._supersede_pending(connection, target.target_id, reason="服务群已移除", reason_code="target_archived")
+                connection.execute("UPDATE news_scope SET active=0 WHERE target_id=?",(target.target_id,))
+                connection.execute("UPDATE announcement_policy SET payload=json_set(payload, '$.enabled', json('false')) WHERE target_id=?",(target.target_id,))
+                for table in ("activity_digest_policy", "maintenance_policy"):
+                    connection.execute(f"UPDATE {table} SET enabled = 0 WHERE target_id = ?", (target.target_id,))
+        return changed
+
+    def get_manual_query_policy(self, target_id: str) -> ManualQueryPolicy:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT activity_query_enabled, maintenance_query_enabled FROM target "
+                "WHERE target_id = ? AND archived = 0", (target_id,),
+            ).fetchone()
+        return ManualQueryPolicy(bool(row[0]), bool(row[1])) if row else ManualQueryPolicy()
+
+    def set_manual_query_policy(self, target_id: str, policy: ManualQueryPolicy) -> None:
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "UPDATE target SET activity_query_enabled = ?, maintenance_query_enabled = ?, updated_at = ? "
+                "WHERE target_id = ? AND archived = 0",
+                (int(policy.activity_enabled), int(policy.maintenance_enabled), utc_now_text(), target_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("未知服务群")
 
     def get_owner_user_id(self) -> str | None:
         return self.get_meta("owner_user_id")
@@ -479,7 +556,7 @@ class StateStore:
     def is_target_enabled(self, target_id: str) -> bool:
         with self._connection() as connection:
             row = connection.execute(
-                "SELECT enabled FROM target WHERE target_id = ?", (target_id,)
+                "SELECT enabled FROM target WHERE target_id = ? AND archived = 0", (target_id,)
             ).fetchone()
         return row is not None and row[0] == 1
 
@@ -487,7 +564,7 @@ class StateStore:
         with self._connection() as connection:
             row = connection.execute(
                 "SELECT enabled, region, classification_codes_json, timezone, digest_hour, "
-                "digest_minute, upcoming_window_minutes, ending_window_minutes "
+                "digest_minute, upcoming_window_minutes, ending_window_minutes, regions_json "
                 "FROM activity_digest_policy WHERE target_id = ?",
                 (target_id,),
             ).fetchone()
@@ -503,15 +580,19 @@ class StateStore:
             digest_minute=int(row[5]),
             upcoming_window_minutes=int(row[6]),
             ending_window_minutes=int(row[7]),
+            regions=tuple(json.loads(row[8])) if row[8] else (str(row[1]),),
         )
 
     def set_activity_digest_policy(
         self, target_id: str, policy: ActivityDigestPolicy
     ) -> None:
+        if any(r not in {"cn","global-na"} for r in policy.selected_regions):
+            raise ValueError("不支持的区域")
+        previous_policy = self.get_activity_digest_policy(target_id)
         now = utc_now_text()
         with self._connection() as connection:
             exists = connection.execute(
-                "SELECT 1 FROM target WHERE target_id = ?", (target_id,)
+                "SELECT 1 FROM target WHERE target_id = ? AND archived = 0", (target_id,)
             ).fetchone()
             if exists is None:
                 raise ValueError("未知投递目标")
@@ -540,6 +621,11 @@ class StateStore:
                 ),
             )
 
+            connection.execute("UPDATE activity_digest_policy SET regions_json=? WHERE target_id=?",(json.dumps(policy.selected_regions),target_id))
+
+            if not policy.enabled:
+                self._supersede_pending(connection, target_id, stream="activity_digest", reason="消息策略已关闭")
+
     def list_enabled_activity_digest_targets(
         self,
     ) -> tuple[tuple[ManagedTarget, ActivityDigestPolicy], ...]:
@@ -555,7 +641,7 @@ class StateStore:
         with self._connection() as connection:
             row = connection.execute(
                 "SELECT enabled, region, timezone, notify_announcements, reminder_window_minutes, "
-                "notify_updates, watermark_at FROM maintenance_policy WHERE target_id = ?",
+                "notify_updates, watermark_at, regions_json FROM maintenance_policy WHERE target_id = ?",
                 (target_id,),
             ).fetchone()
         if row is None:
@@ -568,13 +654,17 @@ class StateStore:
             reminder_window_minutes=int(row[4]),
             notify_updates=bool(row[5]),
             watermark_at=str(row[6]) if row[6] is not None else None,
+            regions=tuple(json.loads(row[7])) if row[7] else (str(row[1]),),
         )
 
     def set_maintenance_policy(self, target_id: str, policy: MaintenancePolicy) -> None:
+        if any(r not in {"cn","global-na"} for r in policy.selected_regions):
+            raise ValueError("不支持的区域")
+        previous_policy = self.get_maintenance_policy(target_id)
         now = utc_now_text()
         with self._connection() as connection:
             exists = connection.execute(
-                "SELECT 1 FROM target WHERE target_id = ?", (target_id,)
+                "SELECT 1 FROM target WHERE target_id = ? AND archived = 0", (target_id,)
             ).fetchone()
             if exists is None:
                 raise ValueError("未知投递目标")
@@ -614,6 +704,14 @@ class StateStore:
                 ),
             )
 
+            connection.execute("UPDATE maintenance_policy SET regions_json=? WHERE target_id=?",(json.dumps(policy.selected_regions),target_id))
+            for region in policy.selected_regions:
+                if not previous_policy.enabled or region not in previous_policy.selected_regions:
+                    connection.execute('INSERT INTO maintenance_scope VALUES(?,?,?) ON CONFLICT(target_id,region) DO UPDATE SET watermark_at=excluded.watermark_at',(target_id,region,now))
+
+            if not policy.enabled:
+                self._supersede_pending(connection, target_id, stream="maintenance", reason="消息策略已关闭")
+
     def list_enabled_maintenance_targets(
         self,
     ) -> tuple[tuple[ManagedTarget, MaintenancePolicy], ...]:
@@ -626,81 +724,74 @@ class StateStore:
         )
 
     def observe_maintenance_candidate(
-        self,
-        *,
-        target_id: str,
-        candidate: EventCandidate,
-        watermark_at: str | None,
-    ) -> str:
-        """持久记录每群已观察的维护版本，返回 new/changed/known/baseline。"""
-
+        self, *, target_id: str, candidate: EventCandidate, watermark_at: str | None,
+    ) -> MaintenanceObservation:
+        """把待规划的 new/changed 意图持久化，避免观察后崩溃丢公告。"""
+        document_key = candidate.document_id if candidate.source_id=="china_news_api" else candidate.source_id+":"+candidate.document_id
         now = utc_now_text()
+        fresh = (watermark_at is not None and candidate.created_at is not None
+                 and _parse_timestamp(candidate.created_at) >= _parse_timestamp(watermark_at))
         with self._connection() as connection:
             row = connection.execute(
-                "SELECT candidate_id, start_at, end_at FROM maintenance_observation "
-                "WHERE target_id = ? AND document_id = ?",
-                (target_id, candidate.document_id),
+                "SELECT candidate_id, start_at, end_at, notification_kind FROM maintenance_observation "
+                "WHERE target_id = ? AND document_id = ?", (target_id, document_key),
             ).fetchone()
+            version_id = candidate.candidate_id
             if row is None:
-                connection.execute(
-                    "INSERT INTO maintenance_observation("
-                    "target_id, document_id, candidate_id, start_at, end_at, observed_at"
-                    ") VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        target_id,
-                        candidate.document_id,
-                        candidate.candidate_id,
-                        candidate.start_at,
-                        candidate.end_at,
-                        now,
-                    ),
-                )
-                if watermark_at is not None and candidate.created_at is not None:
-                    if _parse_timestamp(candidate.created_at) >= _parse_timestamp(watermark_at):
-                        return "new"
-                return "baseline"
-            changed = str(row[1]) != candidate.start_at or str(row[2]) != candidate.end_at
-            if changed or str(row[0]) != candidate.candidate_id:
-                connection.execute(
-                    "UPDATE maintenance_observation SET candidate_id = ?, start_at = ?, "
-                    "end_at = ?, observed_at = ? WHERE target_id = ? AND document_id = ?",
-                    (
-                        candidate.candidate_id,
-                        candidate.start_at,
-                        candidate.end_at,
-                        now,
-                        target_id,
-                        candidate.document_id,
-                    ),
-                )
-            return "changed" if changed else "known"
+                transition = "new" if fresh else "baseline"
+            elif (_parse_timestamp(str(row[1])) != _parse_timestamp(candidate.start_at)
+                  or _parse_timestamp(str(row[2])) != _parse_timestamp(candidate.end_at)):
+                transition = "changed" if fresh else "baseline"
+            else:
+                transition = str(row[3]) if fresh else "baseline"
+                version_id = str(row[0])
+            connection.execute(
+                "INSERT INTO maintenance_observation(target_id, document_id, candidate_id, start_at, end_at, "
+                "observed_at, notification_kind) VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(target_id, document_id) DO UPDATE SET candidate_id = excluded.candidate_id, "
+                "start_at = excluded.start_at, end_at = excluded.end_at, observed_at = excluded.observed_at, "
+                "notification_kind = excluded.notification_kind",
+                (target_id, document_key, version_id, candidate.start_at, candidate.end_at, now, transition),
+            )
+        return MaintenanceObservation(transition or "known", version_id)
 
-    def suppress_maintenance_reminder(
-        self,
-        *,
-        target_id: str,
-        document_id: str,
-        candidate_id: str,
-        reason: str,
-    ) -> None:
+    def notification_exists(self, business_key: str) -> bool:
+        with self._connection() as connection:
+            return connection.execute("SELECT 1 FROM notification_candidate WHERE business_key = ?", (business_key,)).fetchone() is not None
+
+    def maintenance_announcement_covers_reminder(self, business_key: str, *, start: datetime, lead_minutes: int) -> bool:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT status, notification_id FROM notification_candidate WHERE business_key = ?", (business_key,),
+            ).fetchone()
+            if row is None or row[0] in {"failed", "superseded"}:
+                return False
+            if row[0] in {"pending", "sending"}:
+                return True
+            attempts = connection.execute(
+                "SELECT attempted_at FROM delivery_attempt WHERE notification_id = ? "
+                "AND outcome IN ('sent', 'uncertain')", (row[1],),
+            ).fetchall()
+        return any(start - timedelta(minutes=lead_minutes) <= _parse_timestamp(item[0]) < start for item in attempts)
+
+    def digest_window_started(self, target_id: str, window_key: str) -> bool:
+        with self._connection() as connection:
+            return connection.execute(
+                "SELECT 1 FROM notification_candidate WHERE target_id = ? AND stream = 'activity_digest' "
+                "AND substr(window_key, 1, 10) = ? AND (status NOT IN ('pending', 'superseded') OR "
+                "(status = 'superseded' AND retirement_code NOT IN ('pages_reduced','digest_replan'))) LIMIT 1",
+                (target_id, window_key),
+            ).fetchone() is not None
+
+    def prune_digest_pages(self, target_id: str, window_key: str, page_count: int) -> None:
+        keys = [f"activity_digest:{target_id}:{window_key}:{index}" for index in range(page_count)]
         with self._connection() as connection:
             connection.execute(
-                "INSERT OR IGNORE INTO maintenance_reminder_suppression("
-                "target_id, document_id, candidate_id, reason, created_at"
-                ") VALUES (?, ?, ?, ?, ?)",
-                (target_id, document_id, candidate_id, reason, utc_now_text()),
+                "UPDATE notification_candidate SET status = 'superseded', retirement_code = 'pages_reduced', last_error = '摘要分页已减少', updated_at = ? "
+                "WHERE target_id = ? AND stream = 'activity_digest' AND window_key = ? AND status = 'pending' "
+                "AND business_key NOT IN (" + ",".join("?" for _ in keys) + ")",
+                (utc_now_text(), target_id, window_key, *keys),
             )
-
-    def is_maintenance_reminder_suppressed(
-        self, *, target_id: str, document_id: str, candidate_id: str
-    ) -> bool:
-        with self._connection() as connection:
-            row = connection.execute(
-                "SELECT 1 FROM maintenance_reminder_suppression "
-                "WHERE target_id = ? AND document_id = ? AND candidate_id = ?",
-                (target_id, document_id, candidate_id),
-            ).fetchone()
-        return row is not None
 
     def create_notification_candidate(
         self,
@@ -710,27 +801,34 @@ class StateStore:
         stream: str,
         window_key: str,
         message_text: str,
+        expires_at: str | None = None,
+        kind: str = "",
+        region: str | None = None,
     ) -> str | None:
+        if expires_at is not None:
+            expires_at = _parse_timestamp(expires_at).isoformat()
         notification_id = str(uuid4())
         now = utc_now_text()
         with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT notification_id, status FROM notification_candidate WHERE business_key = ?",
+                "SELECT notification_id, status, retirement_code FROM notification_candidate WHERE business_key = ?",
                 (business_key,),
             ).fetchone()
             if existing is not None:
-                if str(existing[1]) == "pending":
+                if str(existing[1]) == "pending" or (existing[1] == "superseded" and existing[2] in {"pages_reduced","digest_replan"}):
                     connection.execute(
-                        "UPDATE notification_candidate SET message_text = ?, updated_at = ?, "
-                        "last_error = NULL WHERE notification_id = ?",
-                        (message_text, now, str(existing[0])),
+                        "UPDATE notification_candidate SET message_text = ?, window_key = ?, updated_at = ?, status = 'pending', retirement_code = '', "
+                        "last_error = CASE WHEN status = 'superseded' THEN NULL ELSE last_error END, "
+                        "expires_at = ?, kind = ?, region = ? WHERE notification_id = ?",
+                        (message_text, window_key, now, expires_at, kind, region, str(existing[0])),
                     )
                 return None
             cursor = connection.execute(
                 "INSERT INTO notification_candidate("
                 "notification_id, business_key, target_id, stream, window_key, message_text, status, "
-                "created_at, updated_at"
-                ") VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+                "created_at, updated_at, expires_at, kind, region"
+                ") VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
                 (
                     notification_id,
                     business_key,
@@ -740,6 +838,9 @@ class StateStore:
                     message_text,
                     now,
                     now,
+                    expires_at,
+                    kind,
+                    region,
                 ),
             )
         return notification_id if cursor.rowcount == 1 else None
@@ -759,7 +860,7 @@ class StateStore:
                 "target.provider_target_id, target.display_name, candidate.message_text "
                 "FROM notification_candidate AS candidate "
                 "JOIN target ON target.target_id = candidate.target_id "
-                "WHERE candidate.status = 'pending' AND target.enabled = 1 "
+                "WHERE candidate.status = 'pending' AND target.enabled = 1 AND target.archived = 0 "
                 + stream_filter
                 + " ORDER BY candidate.created_at ASC LIMIT ?",
                 parameters,
@@ -810,41 +911,160 @@ class StateStore:
                 )
         return len(stale_ids)
 
-    def record_delivery_attempt(
-        self,
-        *,
-        notification_id: str,
-        success: bool,
-        retryable: bool,
-        provider_message_id: str | None,
-        error: str | None,
-    ) -> None:
+    def claim_notification(self, notification_id: str, *, now: datetime | None = None) -> DeliveryClaim | None:
+        current = _parse_timestamp((now or datetime.now(timezone.utc)).isoformat())
+        timestamp = current.isoformat()
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT n.status, n.stream, n.expires_at, n.kind, n.region, n.message_text, "
+                "t.target_id, t.provider, t.target_type, t.provider_target_id, t.display_name, t.enabled, t.archived "
+                "FROM notification_candidate n JOIN target t ON t.target_id = n.target_id "
+                "WHERE n.notification_id = ?", (notification_id,),
+            ).fetchone()
+            if row is None or row[0] != "pending":
+                return None
+            stream, deadline, kind, region = row[1:5]
+            target_id = str(row[6])
+            reason = None
+            if not row[11] or row[12]:
+                reason = "服务群已停用或移除"
+            elif deadline and current >= _parse_timestamp(str(deadline)):
+                reason = "消息业务窗口已结束"
+            elif stream == "activity_digest":
+                policy = connection.execute(
+                    "SELECT enabled, regions_json FROM activity_digest_policy WHERE target_id = ?", (target_id,),
+                ).fetchone()
+                if not policy or not policy[0] or not self._regions_allowed(policy[1], region):
+                    reason = "活动摘要策略已关闭或区域已改变"
+                elif kind=="digest":
+                    reason=self._digest_claim_reason(connection,notification_id,target_id,current)
+            elif stream == "maintenance":
+                policy = connection.execute(
+                    "SELECT enabled, regions_json, notify_announcements, notify_updates, reminder_window_minutes "
+                    "FROM maintenance_policy WHERE target_id = ?", (target_id,),
+                ).fetchone()
+                if not policy or not policy[0] or not self._regions_allowed(policy[1], region):
+                    reason = "维护策略已关闭或区域已改变"
+                elif ((kind == "announcement" and not policy[2]) or
+                      (kind == "update" and not policy[3]) or
+                      (kind == "reminder" and not policy[4])):
+                    reason = "此类维护通知已关闭"
+                elif kind == "reminder" and deadline:
+                    if current < _parse_timestamp(str(deadline)) - timedelta(minutes=int(policy[4])):
+                        return None
+            elif stream == "announcement":
+                reason = self._news_claim_reason(connection, notification_id, target_id,current)
+            else:
+                reason = "不支持的消息流"
+            if reason:
+                connection.execute(
+                    "UPDATE notification_candidate SET status = 'superseded', last_error = ?, updated_at = ?, retirement_code=? "
+                    "WHERE notification_id = ?", (reason, timestamp,"digest_replan" if reason=="活动核实或内容版本已改变，等待重新规划" else "", notification_id),
+                )
+                return None
+            connection.execute(
+                "UPDATE notification_candidate SET status = 'sending', updated_at = ? WHERE notification_id = ?",
+                (timestamp, notification_id),
+            )
+            cursor = connection.execute(
+                "INSERT INTO delivery_attempt(notification_id, attempted_at, success, retryable, outcome) "
+                "VALUES (?, ?, 0, 0, 'in_flight')", (notification_id, timestamp),
+            )
+            return DeliveryClaim(
+                int(cursor.lastrowid),
+                TargetRef(target_id, str(row[7]), str(row[8]), str(row[9]), row[10]),
+                str(row[5]),
+            )
+
+    def finish_delivery_attempt(self, attempt_id: int, result: SendResult) -> None:
+        from dataclasses import replace
+        from .diagnostics import safe_reason
+        if result.error:result=replace(result,error=safe_reason(result.error))
+        if result.success and (not result.provider_message_id or str(result.provider_message_id).strip() in {"", "0"}):
+            result = SendResult(success=False, uncertain=True, error="发送未返回有效消息ID，结果未知")
+        if result.uncertain:
+            status, outcome = "uncertain", "uncertain"
+        elif result.success:
+            status, outcome = "sent", "sent"
+        elif result.retryable:
+            status, outcome = "pending", "not_sent"
+        else:
+            status, outcome = "failed", "failed"
         now = utc_now_text()
         with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT a.notification_id, n.retirement_code FROM delivery_attempt a "
+                "JOIN notification_candidate n ON n.notification_id = a.notification_id "
+                "WHERE a.attempt_id = ? AND a.outcome = 'in_flight'",
+                (attempt_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("投递尝试不存在或已经结束")
+            self._finish_news(connection, str(row[0]), status)
+            candidate_error = result.error
+            if status == "pending" and row[1]:
+                status = "superseded"
+                candidate_error = "消息策略或服务群在发送期间已关闭，不再重试"
             connection.execute(
-                "INSERT INTO delivery_attempt(notification_id, attempted_at, success, retryable, "
-                "provider_message_id, error) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    notification_id,
-                    now,
-                    int(success),
-                    int(retryable),
-                    provider_message_id,
-                    error,
-                ),
+                "UPDATE delivery_attempt SET success = ?, retryable = ?, provider_message_id = ?, error = ?, "
+                "outcome = ?, completed_at = ? WHERE attempt_id = ?",
+                (int(outcome == "sent"), int(outcome == "not_sent"), result.provider_message_id,
+                 result.error, outcome, now, attempt_id),
             )
-            if success:
-                connection.execute(
-                    "UPDATE notification_candidate SET status = 'sent', updated_at = ?, last_error = NULL "
-                    "WHERE notification_id = ?",
-                    (now, notification_id),
-                )
-            elif not retryable:
-                connection.execute(
-                    "UPDATE notification_candidate SET status = 'failed', updated_at = ?, last_error = ? "
-                    "WHERE notification_id = ?",
-                    (now, error, notification_id),
-                )
+            connection.execute(
+                "UPDATE notification_candidate SET status = ?, last_error = ?, updated_at = ? "
+                "WHERE notification_id = ? AND status = 'sending'",
+                (status, candidate_error, now, row[0]),
+            )
+
+    def recover_interrupted_deliveries(self) -> int:
+        """仅在独占运行时启动时调用；在途消息不重发、不冒充成功。"""
+        now = utc_now_text()
+        reason = "上次运行在发送确认前中断，结果未知；请核查"
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                "UPDATE delivery_attempt SET outcome = 'uncertain', retryable = 0, completed_at = ?, error = ? "
+                "WHERE outcome = 'in_flight'", (now, reason),
+            )
+            cursor = connection.execute(
+                "UPDATE notification_candidate SET status = 'uncertain', updated_at = ?, last_error = ? "
+                "WHERE status = 'sending'", (now, reason),
+            )
+            return cursor.rowcount
+
+    def list_deliveries(self, *, limit: int = 100) -> tuple[DeliveryRecord, ...]:
+        if not 1 <= limit <= 500:
+            raise ValueError("记录数量必须在 1 到 500 之间")
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT n.notification_id, COALESCE(t.display_name,t.provider_target_id), n.stream, n.status, "
+                "n.message_text, n.last_error, (SELECT COUNT(*) FROM delivery_attempt a "
+                "WHERE a.notification_id = n.notification_id) FROM notification_candidate n "
+                "JOIN target t ON t.target_id = n.target_id "
+                "ORDER BY CASE WHEN n.status = 'uncertain' THEN 0 ELSE 1 END, n.created_at DESC, n.rowid DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return tuple(DeliveryRecord(*row) for row in rows)
+
+    def close_uncertain_delivery(self, notification_id: str) -> bool:
+        """关闭未知结果；追加人工处理记录，保留原 attempt，不产生发送。"""
+        now = utc_now_text()
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "UPDATE notification_candidate SET status = 'failed', updated_at = ?, "
+                "last_error = '维护者已关闭未知结果，未确认发送成功' "
+                "WHERE notification_id = ? AND status = 'uncertain'", (now, notification_id),
+            )
+            if cursor.rowcount != 1:
+                return False
+            connection.execute(
+                "INSERT INTO delivery_review(notification_id, reviewed_at, decision) VALUES (?, ?, 'closed_without_resend')",
+                (notification_id, now),
+            )
+            return True
 
     def get_meta(self, key: str) -> str | None:
         with self._connection() as connection:
@@ -958,17 +1178,19 @@ class StateStore:
             str(row[1]) if row[1] is not None else None,
         )
 
-    def record_source_failure(self, *, source_id: str, display_name: str, error: str) -> None:
+    def record_source_failure(self, *, source_id: str, display_name: str, error: str, http_status: int | None = None) -> None:
+        from .diagnostics import safe_reason
+        error=safe_reason(error)
         now = utc_now_text()
         with self._connection() as connection:
             connection.execute(
                 "INSERT INTO source_state("
-                "source_id, display_name, last_attempt_at, consecutive_failures, last_error, document_count"
-                ") VALUES (?, ?, ?, 1, ?, 0) "
+                "source_id, display_name, last_attempt_at, consecutive_failures, last_error, document_count, last_http_status"
+                ") VALUES (?, ?, ?, 1, ?, 0, ?) "
                 "ON CONFLICT(source_id) DO UPDATE SET "
                 "display_name = excluded.display_name, last_attempt_at = excluded.last_attempt_at, "
-                "consecutive_failures = source_state.consecutive_failures + 1, last_error = excluded.last_error",
-                (source_id, display_name, now, error),
+                "consecutive_failures = source_state.consecutive_failures + 1, last_error = excluded.last_error, last_http_status = excluded.last_http_status",
+                (source_id, display_name, now, error,http_status),
             )
 
     def get_source_health(self) -> tuple[SourceHealth, ...]:
@@ -1033,7 +1255,7 @@ class StateStore:
         ).isoformat(timespec="seconds")
         review_condition = (
             "detail.document_id IS NULL OR detail.fetched_at < ? "
-            "OR detail.parse_status = 'degraded'"
+            "OR EXISTS (SELECT 1 FROM article_version av WHERE av.source_id=document.source_id AND av.document_id=document.document_id AND av.ready=0) OR detail.parse_status = 'degraded' OR document.title != (SELECT title FROM article_version v WHERE v.source_id=document.source_id AND v.document_id=document.document_id ORDER BY version_id DESC LIMIT 1)"
         )
         parameters: list[object] = [source_id, stale_before]
         if parser_version is not None:
@@ -1049,7 +1271,7 @@ class StateStore:
                 "ON detail.source_id = document.source_id AND detail.document_id = document.document_id "
                 "WHERE document.source_id = ? AND (" + review_condition + ") "
                 "ORDER BY CASE WHEN detail.document_id IS NULL THEN 0 ELSE 1 END, "
-                "document.published_at DESC LIMIT ?",
+                "COALESCE((SELECT last_attempt_at FROM event_verification ev WHERE ev.source_id=document.source_id AND ev.document_id=document.document_id),detail.fetched_at,'') ASC, document.published_at DESC LIMIT ?",
                 parameters,
             ).fetchall()
         return tuple(
@@ -1075,7 +1297,8 @@ class StateStore:
     ) -> None:
         now = utc_now_text()
         content_hash = sha256(detail.content_html.encode("utf-8")).hexdigest()
-        snapshot_source_id = f"china_news_detail/{detail.document_id}"
+        snapshot_source_id = f"{detail.source_id}/detail/{detail.document_id}"
+        previous_candidates = bool([c for c in self.get_event_candidates(detail.source_id) if c.candidate.document_id==detail.document_id])
         with self._connection() as connection:
             connection.execute(
                 "INSERT OR IGNORE INTO source_snapshot"
@@ -1112,7 +1335,7 @@ class StateStore:
                     now,
                     detail.content_html,
                     detail.content_text,
-                    "empty" if not candidates else "parsed",
+                    ("degraded" if previous_candidates else "empty") if not candidates else "parsed",
                     len(candidates),
                     parser_version,
                 ),
@@ -1121,6 +1344,7 @@ class StateStore:
             # existing candidates remain the last-known-good snapshot until a
             # later successful observation replaces them.
             if candidates:
+                prior_created={(kind,_parse_timestamp(start).isoformat(),_parse_timestamp(end).isoformat()):created for kind,start,end,created in connection.execute('SELECT kind,start_at,end_at,created_at FROM event_candidate WHERE source_id=? AND document_id=?',(detail.source_id,detail.document_id))}
                 connection.execute(
                     "DELETE FROM event_candidate WHERE source_id = ? AND document_id = ?",
                     (detail.source_id, detail.document_id),
@@ -1131,8 +1355,8 @@ class StateStore:
                         "INSERT INTO event_candidate("
                         "source_id, document_id, candidate_id, kind, label, evidence_text, start_at, end_at, "
                         "timezone, confidence, region, classification, classification_label, routing, routing_label, "
-                        "classification_reason, parser_version, created_at"
-                        ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "classification_reason, parser_version, created_at,precision,time_assumption"
+                        ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?)",
                         (
                             candidate.source_id,
                             candidate.document_id,
@@ -1140,8 +1364,8 @@ class StateStore:
                             candidate.kind,
                             candidate.label,
                             candidate.evidence_text,
-                            candidate.start_at,
-                            candidate.end_at,
+                            _parse_timestamp(candidate.start_at).isoformat(),
+                            _parse_timestamp(candidate.end_at).isoformat(),
                             candidate.timezone,
                             candidate.confidence,
                             candidate.region,
@@ -1151,9 +1375,19 @@ class StateStore:
                             classified.routing_label,
                             classified.reason,
                             parser_version,
-                            now,
+                            prior_created.get((candidate.kind,_parse_timestamp(candidate.start_at).isoformat(),_parse_timestamp(candidate.end_at).isoformat()),now),
+                            candidate.precision,
+                            candidate.time_assumption,
                         ),
                     )
+
+            if candidates:
+                connection.execute('INSERT INTO event_verification VALUES(?,?,?,?,?,NULL,NULL) ON CONFLICT(source_id,document_id) DO UPDATE SET valid_hash=excluded.valid_hash,last_success_at=excluded.last_success_at,last_attempt_at=excluded.last_attempt_at,error_kind=NULL,error=NULL',(detail.source_id,detail.document_id,content_hash,now,now))
+            elif previous_candidates:
+                connection.execute("INSERT INTO event_verification(source_id,document_id,last_attempt_at,error_kind,error) VALUES(?,?,?,'parse_zero','新正文未能核实原有活动，保留最后有效时间') ON CONFLICT(source_id,document_id) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,error_kind=excluded.error_kind,error=excluded.error",(detail.source_id,detail.document_id,now))
+            else:
+                connection.execute('UPDATE event_verification SET error_kind=NULL,error=NULL WHERE source_id=? AND document_id=?',(detail.source_id,detail.document_id))
+            connection.execute('UPDATE article_version SET ready=1 WHERE version_id=(SELECT MAX(version_id) FROM article_version WHERE source_id=? AND document_id=?)',(detail.source_id,detail.document_id))
 
     def get_detail_content_hash(self, source_id: str, document_id: str) -> str | None:
         with self._connection() as connection:
@@ -1188,6 +1422,9 @@ class StateStore:
                 (source_id, document_id, now, error),
             )
 
+        self.record_verification_attempt(source_id,document_id,error=error,error_kind='detail_failed')
+        self.finish_article_observation(source_id,document_id)
+
     def record_source_probe_success(
         self,
         *,
@@ -1217,7 +1454,7 @@ class StateStore:
                 "candidate.timezone, candidate.confidence, candidate.region, candidate.created_at, "
                 "candidate.classification, "
                 "candidate.classification_label, candidate.routing, candidate.routing_label, "
-                "candidate.classification_reason "
+                "candidate.classification_reason, candidate.precision, candidate.time_assumption "
                 "FROM event_candidate AS candidate "
                 "JOIN source_document AS document "
                 "ON document.source_id = candidate.source_id AND document.document_id = candidate.document_id "
@@ -1241,6 +1478,7 @@ class StateStore:
                     confidence=str(row[11]),
                     region=str(row[12]),
                     created_at=str(row[13]) if row[13] is not None else None,
+                    precision=str(row[19]),time_assumption=str(row[20]),
                 ),
                 classification=str(row[14]),
                 classification_label=str(row[15]),
@@ -1256,8 +1494,9 @@ class StateStore:
     ) -> tuple[ClassifiedEventCandidate, ...]:
         return tuple(
             item
-            for item in self.get_event_candidates("china_news_api")
-            if item.candidate.kind == "maintenance" and item.candidate.region == region
+            for source in ("china_news_api","lodestone_atom","lodestone_topics")
+            for item in self.get_event_candidates(source)
+            if item.candidate.kind == "maintenance" and item.candidate.region == region and item.candidate.precision=="minute"
         )
 
     def get_calendar_category_options(self) -> tuple[CalendarCategoryOption, ...]:
@@ -1305,10 +1544,16 @@ class StateStore:
         *,
         region: str | None = None,
         classification_codes: tuple[str, ...] = (),
+        use_global_categories: bool = True,
+        include_window_end: bool = False,
     ) -> tuple[CalendarEntry, ...]:
         """取得与给定半开时间区间相交，且分类策略已选入日历的候选。"""
 
-        filters: list[str] = []
+        filters = [
+            "COALESCE(policy.included, CASE WHEN candidate.routing = 'calendar_candidate' THEN 1 ELSE 0 END) = 1"
+            if use_global_categories else "candidate.routing = 'calendar_candidate'"
+        ]
+        start_operator = "<=" if include_window_end else "<"
         parameters: list[object] = [end_at, start_at]
         if region is not None:
             filters.append("candidate.region = ?")
@@ -1325,15 +1570,14 @@ class StateStore:
             rows = connection.execute(
                 "SELECT candidate.document_id, document.title, document.url, candidate.classification_label, "
                 "candidate.routing_label, candidate.start_at, candidate.end_at, candidate.evidence_text, "
-                "candidate.region, candidate.classification "
+                "candidate.region, candidate.classification, candidate.source_id,candidate.precision "
                 "FROM event_candidate AS candidate "
                 "JOIN source_document AS document "
                 "ON document.source_id = candidate.source_id AND document.document_id = candidate.document_id "
                 "LEFT JOIN calendar_category_policy AS policy "
                 "ON policy.classification_label = candidate.classification_label "
-                "WHERE julianday(candidate.start_at) < julianday(?) "
+                f"WHERE julianday(candidate.start_at) {start_operator} julianday(?) "
                 "AND julianday(candidate.end_at) >= julianday(?) "
-                "AND COALESCE(policy.included, CASE WHEN candidate.routing = 'calendar_candidate' THEN 1 ELSE 0 END) = 1 "
                 + filter_sql
                 + " ORDER BY candidate.start_at ASC, candidate.document_id ASC",
                 parameters,
@@ -1371,97 +1615,63 @@ class StateStore:
 
     @staticmethod
     def _ensure_notification_status_schema(connection: sqlite3.Connection) -> None:
-        """Rebuild the notification tables when upgrading the status enum.
-
-        SQLite cannot alter a CHECK constraint in place. The old schema used
-        ``sent`` for both successful and terminally failed attempts; preserve
-        those rows while giving failures and superseded candidates explicit
-        terminal states.
-        """
-
-        row = connection.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notification_candidate'"
-        ).fetchone()
-        table_sql = str(row[0]) if row is not None and row[0] is not None else ""
-        attempt_row = connection.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'delivery_attempt'"
-        ).fetchone()
-        attempt_sql = str(attempt_row[0]) if attempt_row is not None and attempt_row[0] is not None else ""
-        if (
-            "'failed'" in table_sql
-            and "'superseded'" in table_sql
-            and "ON DELETE CASCADE" in attempt_sql.upper()
-        ):
+        sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'notification_candidate'"
+        ).fetchone()[0]
+        if "'uncertain'" in sql:
             return
-
+        # Executed before other migration writes. No executescript inside the
+        # transaction: rebuilding the two FK-linked tables must be atomic.
         connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute("BEGIN IMMEDIATE")
         try:
-            connection.execute(
-                """
-                CREATE TABLE notification_candidate_v14 (
-                    notification_id TEXT PRIMARY KEY,
-                    business_key TEXT NOT NULL UNIQUE,
-                    target_id TEXT NOT NULL,
-                    stream TEXT NOT NULL,
-                    window_key TEXT NOT NULL,
-                    message_text TEXT NOT NULL,
-                    status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'superseded')),
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    last_error TEXT,
-                    FOREIGN KEY (target_id) REFERENCES target(target_id) ON DELETE CASCADE
-                )
-                """
-            )
-            connection.execute(
-                """
-                INSERT INTO notification_candidate_v14(
-                    notification_id, business_key, target_id, stream, window_key,
-                    message_text, status, created_at, updated_at, last_error
-                )
-                SELECT notification_id, business_key, target_id, stream, window_key,
-                       message_text,
-                       CASE
-                         WHEN status = 'sent' AND last_error IS NULL THEN 'sent'
-                         WHEN status = 'sent' AND last_error = '被新的维护时间版本替代' THEN 'superseded'
-                         WHEN status = 'sent' THEN 'failed'
-                         ELSE status
-                       END,
-                       created_at, updated_at, last_error
-                FROM notification_candidate
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE delivery_attempt_v14 (
-                    attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    notification_id TEXT NOT NULL,
-                    attempted_at TEXT NOT NULL,
-                    success INTEGER NOT NULL CHECK (success IN (0, 1)),
-                    retryable INTEGER NOT NULL CHECK (retryable IN (0, 1)),
-                    provider_message_id TEXT,
-                    error TEXT,
-                    FOREIGN KEY (notification_id) REFERENCES notification_candidate_v14(notification_id) ON DELETE CASCADE
-                )
-                """
-            )
-            connection.execute(
-                """
-                INSERT INTO delivery_attempt_v14(
-                    attempt_id, notification_id, attempted_at, success, retryable,
-                    provider_message_id, error
-                )
-                SELECT attempt_id, notification_id, attempted_at, success, retryable,
-                       provider_message_id, error
-                FROM delivery_attempt
-                """
-            )
+            connection.execute("""CREATE TABLE notification_candidate_v16 (
+                notification_id TEXT PRIMARY KEY, business_key TEXT NOT NULL UNIQUE,
+                target_id TEXT NOT NULL REFERENCES target(target_id),
+                stream TEXT NOT NULL, window_key TEXT NOT NULL, message_text TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('pending','sending','uncertain','sent','failed','superseded')),
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_error TEXT,
+                expires_at TEXT, kind TEXT NOT NULL DEFAULT '', region TEXT
+            )""")
+            connection.execute("""INSERT INTO notification_candidate_v16
+                (notification_id,business_key,target_id,stream,window_key,message_text,status,created_at,updated_at,last_error)
+                SELECT notification_id,business_key,target_id,stream,window_key,message_text,
+                    CASE
+                        WHEN status = 'sent' AND last_error = '被新的维护时间版本替代' THEN 'superseded'
+                        WHEN status = 'sent' AND last_error IS NOT NULL THEN 'failed'
+                        WHEN status = 'pending' AND EXISTS (
+                            SELECT 1 FROM delivery_attempt a WHERE a.notification_id = notification_candidate.notification_id
+                        ) THEN 'uncertain'
+                        WHEN status = 'pending' THEN 'superseded'
+                        ELSE status
+                    END,
+                    created_at,updated_at,
+                    CASE WHEN status = 'pending' THEN '旧版本待发送消息已暂停，需核查历史；不自动回放'
+                         ELSE last_error END
+                FROM notification_candidate""")
+            connection.execute("""CREATE TABLE delivery_attempt_v16 (
+                attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                notification_id TEXT NOT NULL REFERENCES notification_candidate_v16(notification_id),
+                attempted_at TEXT NOT NULL, success INTEGER NOT NULL CHECK(success IN (0,1)),
+                retryable INTEGER NOT NULL CHECK(retryable IN (0,1)),
+                provider_message_id TEXT, error TEXT,
+                outcome TEXT NOT NULL CHECK(outcome IN ('in_flight','sent','not_sent','failed','uncertain')),
+                completed_at TEXT
+            )""")
+            connection.execute("""INSERT INTO delivery_attempt_v16
+                SELECT attempt_id,notification_id,attempted_at,success,retryable,provider_message_id,error,
+                    CASE WHEN success = 1 THEN 'sent' WHEN retryable = 1 THEN 'uncertain' ELSE 'failed' END,
+                    attempted_at FROM delivery_attempt""")
             connection.execute("DROP TABLE delivery_attempt")
             connection.execute("DROP TABLE notification_candidate")
-            connection.execute(
-                "ALTER TABLE notification_candidate_v14 RENAME TO notification_candidate"
-            )
-            connection.execute("ALTER TABLE delivery_attempt_v14 RENAME TO delivery_attempt")
+            connection.execute("ALTER TABLE notification_candidate_v16 RENAME TO notification_candidate")
+            connection.execute("ALTER TABLE delivery_attempt_v16 RENAME TO delivery_attempt")
+            if connection.execute("PRAGMA foreign_key_check").fetchall():
+                raise sqlite3.IntegrityError("投递表迁移后的外键校验失败")
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
         finally:
             connection.execute("PRAGMA foreign_keys = ON")
 
@@ -1485,7 +1695,7 @@ class StateStore:
         # SQLite falls back to its normal journal for in-memory databases.
         if self._database_path != Path(":memory:"):
             connection.execute("PRAGMA journal_mode = WAL")
-            connection.execute("PRAGMA synchronous = NORMAL")
+            connection.execute("PRAGMA synchronous = FULL")
         return connection
 
     @contextmanager
@@ -1513,6 +1723,8 @@ def _calendar_entry_from_row(row: tuple[object, ...]) -> CalendarEntry:
         evidence_text=str(row[7]),
         region=str(row[8]) if len(row) > 8 else "cn",
         classification=str(row[9]) if len(row) > 9 else "unclassified",
+        source_id=str(row[10]) if len(row)>10 else "china_news_api",
+        precision=str(row[11]) if len(row)>11 else "unknown",
     )
 
 

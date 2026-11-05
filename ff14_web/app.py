@@ -19,6 +19,7 @@ from ff14_core.source_models import (
     CalendarCategoryOption,
     CalendarEntry,
     MaintenancePolicy,
+    ManualQueryPolicy,
     ReviewPage,
 )
 from ff14_core.storage import ManagedTarget, StateStore
@@ -39,9 +40,19 @@ class TargetUpdate(BaseModel):
     enabled: bool
 
 
+class ManualQueryPolicyUpdate(BaseModel):
+    activity_enabled: bool
+    maintenance_enabled: bool
+
+
+class DeliveryCloseRequest(BaseModel):
+    confirm: bool
+
+
 class ActivityPolicyUpdate(BaseModel):
     enabled: bool
     region: str = "cn"
+    regions: list[str] | None = None
     classification_codes: list[str] = Field(default_factory=list)
     digest_hour: int = 20
     digest_minute: int = 0
@@ -52,6 +63,7 @@ class ActivityPolicyUpdate(BaseModel):
 class MaintenancePolicyUpdate(BaseModel):
     enabled: bool
     region: str = "cn"
+    regions: list[str] | None = None
     notify_announcements: bool = True
     reminder_window_minutes: int = 24 * 60
     notify_updates: bool = True
@@ -152,6 +164,46 @@ def create_app(store: StateStore | None = None) -> FastAPI:
             )
         )
 
+    @app.get("/deliveries", response_class=HTMLResponse)
+    def deliveries_page() -> HTMLResponse:
+        labels = {"pending": "待发送", "sending": "发送中", "uncertain": "结果未知，需核查",
+                  "sent": "已确认成功", "failed": "未成功／已关闭", "superseded": "已停止投递"}
+        entries = []
+        for record in store.list_deliveries():
+            action = (f'<button data-close-delivery="{escape(record.notification_id, quote=True)}">关闭记录（不重发）</button>'
+                      if record.status == "uncertain" else "")
+            entries.append(
+                f'<article class="review-entry"><h2>{escape(record.target_name)} · '
+                f'{escape(labels[record.status])}</h2><p>{escape(record.stream)} · {record.attempts} 次尝试</p>'
+                f'<p>{escape(record.last_error or "")}</p><pre style="white-space:pre-wrap">'
+                f'{escape(record.message_text)}</pre>{action}</article>'
+            )
+        body = ('<main class="app-shell"><header class="topbar"><h1>投递记录</h1>'
+                '<nav class="topnav"><a href="/settings">运行设置</a><a href="/articles">文章版本</a><a href="/news">公告</a><a href="/deliveries">投递记录</a><a href="/access">群授权</a><a href="/">日历</a></nav></header>'
+                '<p>最近 100 条记录，未知结果优先显示。请先核对群内消息；关闭记录会保留历史，'
+                '不会重发，也不会将未知结果记为成功。</p>'
+                + ("".join(entries) or '<p>暂无投递记录</p>') + '</main><script>' + _DELIVERY_SCRIPT + '</script>')
+        return HTMLResponse(_page_shell("投递记录", body))
+
+    @app.put("/api/deliveries/{notification_id}/close")
+    def close_delivery(notification_id: str, update: DeliveryCloseRequest) -> dict[str, bool]:
+        if not update.confirm:
+            raise HTTPException(status_code=422, detail="需要明确确认关闭记录")
+        if not store.close_uncertain_delivery(notification_id):
+            raise HTTPException(status_code=409, detail="记录不存在或已不再是未知结果")
+        return {"closed": True}
+
+    @app.put("/api/access-settings/groups/{group_id}/query-policy")
+    def update_query_policy(group_id: str, update: ManualQueryPolicyUpdate) -> dict[str, bool]:
+        normalized = _normalize_numeric_id(group_id, label="QQ群号")
+        target = next((item.target for item in store.list_targets()
+                       if item.target.provider_target_id == normalized), None)
+        if target is None:
+            raise HTTPException(status_code=404, detail="未找到该服务群")
+        policy = ManualQueryPolicy(update.activity_enabled, update.maintenance_enabled)
+        store.set_manual_query_policy(target.target_id, policy)
+        return {"activity_enabled": policy.activity_enabled, "maintenance_enabled": policy.maintenance_enabled}
+
     @app.get("/api/calendar-categories")
     def calendar_categories() -> list[dict[str, object]]:
         return [_option_json(option) for option in store.get_calendar_category_options()]
@@ -176,6 +228,7 @@ def create_app(store: StateStore | None = None) -> FastAPI:
                     target,
                     store.get_activity_digest_policy(target.target.target_id),
                     store.get_maintenance_policy(target.target.target_id),
+                    store.get_manual_query_policy(target.target.target_id),
                 )
                 for target in store.list_targets()
             ],
@@ -197,6 +250,7 @@ def create_app(store: StateStore | None = None) -> FastAPI:
             ManagedTarget(target=target, enabled=update.enabled),
             store.get_activity_digest_policy(target.target_id),
             store.get_maintenance_policy(target.target_id),
+            store.get_manual_query_policy(target.target_id),
         )
 
     @app.put("/api/access-settings/groups/{group_id}/activity-policy")
@@ -206,7 +260,7 @@ def create_app(store: StateStore | None = None) -> FastAPI:
         normalized_group_id = _normalize_numeric_id(group_id, label="QQ群号")
         if normalized_group_id is None:
             raise HTTPException(status_code=422, detail="QQ群号不能为空")
-        if update.region not in {"cn", "global-na", "global-eu", "global-jp", "global-oc"}:
+        if any(r not in {"cn", "global-na"} for r in (update.regions if update.regions is not None else [update.region])):
             raise HTTPException(status_code=422, detail="不支持的活动区域")
         if not 0 <= update.digest_hour <= 23 or not 0 <= update.digest_minute <= 59:
             raise HTTPException(status_code=422, detail="摘要时间无效")
@@ -225,7 +279,8 @@ def create_app(store: StateStore | None = None) -> FastAPI:
             for code in update.classification_codes
         ):
             raise HTTPException(status_code=422, detail="存在不支持的活动分类")
-        if update.upcoming_window_minutes not in UPCOMING_DIGEST_WINDOW_VALUES:
+        old = store.get_activity_digest_policy(target.target_id)
+        if update.upcoming_window_minutes not in UPCOMING_DIGEST_WINDOW_VALUES and update.upcoming_window_minutes != old.upcoming_window_minutes:
             raise HTTPException(status_code=422, detail="开始前窗口必须为 0、7 天、14 天或 30 天")
         if update.ending_window_minutes < 0:
             raise HTTPException(status_code=422, detail="活动时间窗口不能为负数")
@@ -235,7 +290,8 @@ def create_app(store: StateStore | None = None) -> FastAPI:
             classification_codes = ()
         policy = ActivityDigestPolicy(
             enabled=update.enabled,
-            region=update.region,
+            region=update.regions[0] if update.regions else update.region,
+            regions=tuple(update.regions) if update.regions is not None else None,
             classification_codes=classification_codes,
             timezone=old.timezone,
             digest_hour=update.digest_hour,
@@ -253,7 +309,7 @@ def create_app(store: StateStore | None = None) -> FastAPI:
         normalized_group_id = _normalize_numeric_id(group_id, label="QQ群号")
         if normalized_group_id is None:
             raise HTTPException(status_code=422, detail="QQ群号不能为空")
-        if update.region not in {"cn", "global-na", "global-eu", "global-jp", "global-oc"}:
+        if any(r not in {"cn", "global-na"} for r in (update.regions if update.regions is not None else [update.region])):
             raise HTTPException(status_code=422, detail="不支持的维护区域")
         if update.reminder_window_minutes not in MAINTENANCE_REMINDER_VALUES:
             raise HTTPException(status_code=422, detail="维护提前提醒必须为 0、1 小时、6 小时或 24 小时")
@@ -270,7 +326,8 @@ def create_app(store: StateStore | None = None) -> FastAPI:
         old = store.get_maintenance_policy(target.target_id)
         policy = MaintenancePolicy(
             enabled=update.enabled,
-            region=update.region,
+            region=update.regions[0] if update.regions else update.region,
+            regions=tuple(update.regions) if update.regions is not None else None,
             timezone=old.timezone,
             notify_announcements=update.notify_announcements,
             reminder_window_minutes=update.reminder_window_minutes,
@@ -291,6 +348,8 @@ def create_app(store: StateStore | None = None) -> FastAPI:
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
+    from .p3 import install_p3_routes
+    install_p3_routes(app, store, _page_shell)
     return app
 
 
@@ -351,7 +410,7 @@ def _render_calendar(
       <main class="app-shell">
         <header class="topbar">
           <a class="brand" href="/">FF14 活动日历</a>
-          <nav class="topnav"><a href="/access">群授权</a></nav>
+          <nav class="topnav"><a href="/settings">运行设置</a><a href="/articles">文章版本</a><a href="/news">公告</a><a href="/deliveries">投递记录</a><a href="/access">群授权</a></nav>
         </header>
         <div class="content-layout">
           <section class="calendar-panel">
@@ -366,7 +425,7 @@ def _render_calendar(
             <div class="month-grid">{''.join(days)}</div>
           </section>
           <aside class="policy-panel">
-            <h2>推送日历分类</h2>
+            <h2>月历显示分类</h2><p>仅影响本页显示；群摘要使用各群的推送分类。</p>
             <div class="category-list">{''.join(_render_category_option(option) for option in options) or '<p class="empty-state">暂无活动候选</p>'}</div>
           </aside>
         </div>
@@ -415,7 +474,7 @@ def _render_review(review: ReviewPage) -> str:
       <main class="app-shell review-shell">
         <header class="topbar">
           <a class="brand" href="/">FF14 活动日历</a>
-          <nav class="topnav"><a href="/">日历</a><a href="/access">群授权</a></nav>
+          <nav class="topnav"><a href="/settings">运行设置</a><a href="/articles">文章版本</a><a href="/news">公告</a><a href="/deliveries">投递记录</a><a href="/">日历</a><a href="/access">群授权</a></nav>
         </header>
         <section class="review-panel">
           <header class="review-toolbar"><h1>待审核活动</h1><span>{review.total_count} 条</span></header>
@@ -452,6 +511,7 @@ def _render_access_settings(
             target,
             store.get_activity_digest_policy(target.target.target_id),
             store.get_maintenance_policy(target.target.target_id),
+            store.get_manual_query_policy(target.target.target_id),
         )
         for target in targets
     )
@@ -461,7 +521,7 @@ def _render_access_settings(
       <main class="app-shell access-shell">
         <header class="topbar">
           <a class="brand" href="/">FF14 活动日历</a>
-          <nav class="topnav"><a href="/">日历</a></nav>
+          <nav class="topnav"><a href="/settings">运行设置</a><a href="/articles">文章版本</a><a href="/news">公告</a><a href="/deliveries">投递记录</a><a href="/">日历</a></nav>
         </header>
         <section class="access-panel">
           <header class="access-header"><h1>群授权</h1></header>
@@ -474,7 +534,7 @@ def _render_access_settings(
             </div>
           </section>
           <section class="setting-section">
-            <header class="section-toolbar"><h2>服务群白名单</h2></header>
+            <header class="section-toolbar"><h2>服务群白名单</h2></header><p>群员查询与主动推送独立配置。移除服务群会保留投递历史，并关闭该群策略。</p>
             <form id="add-group" class="setting-row">
               <label class="field-label" for="group-id">QQ群号</label>
               <input id="group-id" inputmode="numeric" autocomplete="off" required>
@@ -494,6 +554,7 @@ def _render_target_row(
     managed_target: ManagedTarget,
     policy: ActivityDigestPolicy,
     maintenance_policy: MaintenancePolicy,
+    query_policy: ManualQueryPolicy,
 ) -> str:
     group_id = managed_target.target.provider_target_id
     encoded_group_id = escape(group_id, quote=True)
@@ -503,16 +564,7 @@ def _render_target_row(
     maintenance_announcements_checked = " checked" if maintenance_policy.notify_announcements else ""
     maintenance_updates_checked = " checked" if maintenance_policy.notify_updates else ""
     digest_time = f"{policy.digest_hour:02d}:{policy.digest_minute:02d}"
-    region_options = "".join(
-        f'<option value="{region}"{" selected" if region == policy.region else ""}>{label}</option>'
-        for region, label in (
-            ("cn", "国服"),
-            ("global-na", "国际服 NA"),
-            ("global-eu", "国际服 EU"),
-            ("global-jp", "国际服 JP"),
-            ("global-oc", "国际服 OC"),
-        )
-    )
+    region_options = "".join(f'<label><input type="checkbox" data-digest-region value="{r}"{" checked" if r in policy.selected_regions else ""}>{label}</label>' for r,label in (("cn","国服"),("global-na","国际服 NA")))
     classification_options = "".join(
         f'<label class="classification-toggle"><input type="checkbox" data-digest-classification value="{code}"'
         f'{" checked" if not policy.classification_codes or code in policy.classification_codes else ""}> {label}</label>'
@@ -524,16 +576,7 @@ def _render_target_row(
     ending_options = _render_digest_window_options(
         policy.ending_window_minutes, ENDING_DIGEST_WINDOW_OPTIONS
     )
-    maintenance_region_options = "".join(
-        f'<option value="{region}"{" selected" if region == maintenance_policy.region else ""}>{label}</option>'
-        for region, label in (
-            ("cn", "国服"),
-            ("global-na", "国际服 NA"),
-            ("global-eu", "国际服 EU"),
-            ("global-jp", "国际服 JP"),
-            ("global-oc", "国际服 OC"),
-        )
-    )
+    maintenance_region_options = "".join(f'<label><input type="checkbox" data-maintenance-region value="{r}"{" checked" if r in maintenance_policy.selected_regions else ""}>{label}</label>' for r,label in (("cn","国服"),("global-na","国际服 NA")))
     maintenance_reminder_options = _render_digest_window_options(
         maintenance_policy.reminder_window_minutes, MAINTENANCE_REMINDER_OPTIONS
     )
@@ -544,17 +587,19 @@ def _render_target_row(
           <label class="inline-toggle"><input type="checkbox" data-target-enabled{checked}> 启用服务</label>
           <label class="inline-toggle"><input type="checkbox" data-digest-enabled{digest_checked}> 推送活动摘要</label>
           <label class="inline-toggle"><input type="checkbox" data-maintenance-enabled{maintenance_checked}> 推送维护提醒</label>
+          <label class="inline-toggle"><input type="checkbox" data-query-activity{" checked" if query_policy.activity_enabled else ""}> 群员活动查询</label>
+          <label class="inline-toggle"><input type="checkbox" data-query-maintenance{" checked" if query_policy.maintenance_enabled else ""}> 群员维护查询</label>
           <button type="button" class="remove-target" title="移除服务群" aria-label="移除服务群">移除</button>
         </div>
         <div class="digest-settings">
-          <label class="digest-field">活动区域<select data-digest-region>{region_options}</select></label>
+          <label class="digest-field">活动区域（可多选）{region_options}</label>
           <label class="digest-field">发送时间<input type="time" data-digest-time value="{digest_time}"></label>
           <fieldset class="digest-field classification-fields"><legend>推送分类</legend><div class="classification-list">{classification_options}</div><small class="field-hint">全部勾选或全部取消都表示全部分类</small></fieldset>
           <label class="digest-field">开始前<select data-digest-upcoming>{upcoming_options}</select></label>
           <label class="digest-field">结束前<select data-digest-ending>{ending_options}</select></label>
         </div>
         <div class="digest-settings maintenance-settings">
-          <label class="digest-field">维护区域<select data-maintenance-region>{maintenance_region_options}</select></label>
+          <label class="digest-field">维护区域（可多选）{maintenance_region_options}</label>
           <label class="inline-toggle"><input type="checkbox" data-maintenance-announcements{maintenance_announcements_checked}> 推送维护公告</label>
           <label class="digest-field">提前提醒<select data-maintenance-reminder>{maintenance_reminder_options}</select></label>
           <label class="inline-toggle"><input type="checkbox" data-maintenance-updates{maintenance_updates_checked}> 推送时间变更</label>
@@ -597,6 +642,7 @@ def _target_json(
     managed_target: ManagedTarget,
     policy: ActivityDigestPolicy,
     maintenance_policy: MaintenancePolicy,
+    query_policy: ManualQueryPolicy,
 ) -> dict[str, object]:
     return {
         "provider": managed_target.target.provider,
@@ -605,6 +651,8 @@ def _target_json(
         "enabled": managed_target.enabled,
         "activity_digest": _policy_json(policy),
         "maintenance": _maintenance_policy_json(maintenance_policy),
+        "manual_queries": {"activity_enabled": query_policy.activity_enabled,
+                           "maintenance_enabled": query_policy.maintenance_enabled},
     }
 
 
@@ -612,6 +660,7 @@ def _policy_json(policy: ActivityDigestPolicy) -> dict[str, object]:
     return {
         "enabled": policy.enabled,
         "region": policy.region,
+        "regions": list(policy.selected_regions),
         "digest_hour": policy.digest_hour,
         "digest_minute": policy.digest_minute,
         "timezone": policy.timezone,
@@ -625,6 +674,7 @@ def _maintenance_policy_json(policy: MaintenancePolicy) -> dict[str, object]:
     return {
         "enabled": policy.enabled,
         "region": policy.region,
+        "regions": list(policy.selected_regions),
         "timezone": policy.timezone,
         "notify_announcements": policy.notify_announcements,
         "reminder_window_minutes": policy.reminder_window_minutes,
@@ -744,7 +794,7 @@ document.querySelectorAll('[data-digest-enabled], [data-digest-region], [data-di
     const row = input.closest('[data-group-id]');
     const enabled = row.querySelector('[data-digest-enabled]').checked;
     const [hour, minute] = row.querySelector('[data-digest-time]').value.split(':').map(Number);
-    const region = row.querySelector('[data-digest-region]').value;
+    const regions = [...row.querySelectorAll('[data-digest-region]:checked')].map(x=>x.value);
     const classification_codes = Array.from(row.querySelectorAll('[data-digest-classification]:checked')).map((checkbox) => checkbox.value);
     const upcoming_window_minutes = Number(row.querySelector('[data-digest-upcoming]').value);
     const ending_window_minutes = Number(row.querySelector('[data-digest-ending]').value);
@@ -753,7 +803,7 @@ document.querySelectorAll('[data-digest-enabled], [data-digest-region], [data-di
       const response = await fetch('/api/access-settings/groups/' + encodeURIComponent(row.dataset.groupId) + '/activity-policy', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({enabled, region, classification_codes, digest_hour: hour, digest_minute: minute, upcoming_window_minutes, ending_window_minutes}),
+        body: JSON.stringify({enabled, regions, classification_codes, digest_hour: hour, digest_minute: minute, upcoming_window_minutes, ending_window_minutes}),
       });
       if (!response.ok) throw new Error(await response.text());
       showMessage(enabled ? '活动摘要策略已启用' : '活动摘要策略已停用');
@@ -769,7 +819,7 @@ document.querySelectorAll('[data-maintenance-enabled], [data-maintenance-region]
   input.addEventListener('change', async () => {
     const row = input.closest('[data-group-id]');
     const enabled = row.querySelector('[data-maintenance-enabled]').checked;
-    const region = row.querySelector('[data-maintenance-region]').value;
+    const regions = [...row.querySelectorAll('[data-maintenance-region]:checked')].map(x=>x.value);
     const notify_announcements = row.querySelector('[data-maintenance-announcements]').checked;
     const reminder_window_minutes = Number(row.querySelector('[data-maintenance-reminder]').value);
     const notify_updates = row.querySelector('[data-maintenance-updates]').checked;
@@ -778,7 +828,7 @@ document.querySelectorAll('[data-maintenance-enabled], [data-maintenance-region]
       const response = await fetch('/api/access-settings/groups/' + encodeURIComponent(row.dataset.groupId) + '/maintenance-policy', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({enabled, region, notify_announcements, reminder_window_minutes, notify_updates}),
+        body: JSON.stringify({enabled, regions, notify_announcements, reminder_window_minutes, notify_updates}),
       });
       if (!response.ok) throw new Error(await response.text());
       showMessage(enabled ? '维护提醒策略已启用' : '维护提醒策略已停用');
@@ -786,6 +836,28 @@ document.querySelectorAll('[data-maintenance-enabled], [data-maintenance-region]
       showMessage('无法更新维护提醒策略', true);
     } finally {
       input.disabled = false;
+    }
+  });
+});
+
+document.querySelectorAll('[data-query-activity], [data-query-maintenance]').forEach((input) => {
+  input.addEventListener('change', async () => {
+    const row = input.closest('[data-group-id]');
+    const controls = row.querySelectorAll('[data-query-activity], [data-query-maintenance]');
+    controls.forEach((control) => { control.disabled = true; });
+    try {
+      const response = await fetch('/api/access-settings/groups/' + encodeURIComponent(row.dataset.groupId) + '/query-policy', {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({activity_enabled: row.querySelector('[data-query-activity]').checked,
+                              maintenance_enabled: row.querySelector('[data-query-maintenance]').checked}),
+      });
+      if (!response.ok) throw new Error('save failed');
+      showMessage('群员查询权限已保存');
+    } catch (error) {
+      input.checked = !input.checked;
+      showMessage('无法保存群员查询权限', true);
+    } finally {
+      controls.forEach((control) => { control.disabled = false; });
     }
   });
 });
@@ -852,4 +924,24 @@ h2 { font-size: 15px; color: #2e3a38; }
 .access-shell { max-width: 1100px; }.access-panel { padding-top: 26px; }.access-header { border-bottom: 1px solid #d9dfd8; padding-bottom: 13px; }.setting-section { padding: 20px 0; border-bottom: 1px solid #d9dfd8; }.setting-section h2 { margin-bottom: 12px; }.setting-row { display: flex; align-items: center; gap: 10px; }.field-label { min-width: 64px; color: #596562; font-size: 14px; }.setting-row input[type="text"], .setting-row input:not([type]) { width: min(280px, 100%); height: 36px; border: 1px solid #cbd5cf; border-radius: 5px; background: #fff; padding: 0 9px; color: #202b2a; font: inherit; }.setting-row button, .remove-target { min-height: 34px; border: 1px solid #315f59; border-radius: 5px; background: #315f59; padding: 0 12px; color: #fff; font: inherit; cursor: pointer; }.setting-row button:disabled, .remove-target:disabled { cursor: wait; opacity: .6; }.inline-toggle { display: inline-flex; align-items: center; gap: 5px; color: #475451; font-size: 14px; white-space: nowrap; }.inline-toggle input, .classification-toggle input { width: 16px; height: 16px; accent-color: #1d776f; }.target-list { border-top: 1px solid #d9dfd8; }.target-row { border-bottom: 1px solid #d9dfd8; padding: 13px 0; }.target-summary { display: flex; min-height: 34px; align-items: center; gap: 14px; }.target-id { flex: 1; color: #263432; font-variant-numeric: tabular-nums; }.digest-settings { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 11px 0 0; padding: 11px 0 0; border-top: 1px solid #edf0eb; }.digest-field { display: grid; gap: 5px; color: #596562; font-size: 12px; }.digest-field select, .digest-field input[type="time"] { min-width: 108px; min-height: 32px; border: 1px solid #cbd5cf; border-radius: 5px; background: #fff; padding: 0 6px; color: #35423f; font: inherit; }.classification-fields { min-width: 235px; margin: 0; border: 0; padding: 0; }.classification-fields legend { padding: 0; color: #596562; font-size: 12px; }.classification-list { display: flex; flex-wrap: wrap; gap: 6px 10px; padding-top: 5px; }.classification-toggle { display: inline-flex; align-items: center; gap: 4px; color: #475451; font-size: 13px; white-space: nowrap; }.remove-target { border-color: #b25572; background: #fff; color: #9a3452; }.access-message { min-height: 20px; margin-top: 15px; color: #356e67; font-size: 14px; }.access-message.error { color: #a34242; }
 @media (max-width: 900px) { .app-shell { padding: 16px; }.content-layout { grid-template-columns: 1fr; }.policy-panel { order: -1; }.category-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }.category-option { border-right: 1px solid #d9dfd8; padding: 0 6px; }.day-cell { min-height: 104px; }.calendar-entry { font-size: 11px; } }
 @media (max-width: 560px) { .app-shell { padding: 12px; }.brand { font-size: 18px; }.weekday-row span { padding: 7px 3px; font-size: 11px; }.day-cell { min-height: 82px; padding: 4px 3px; }.calendar-entry { padding: 2px; }.calendar-entry span { display: none; }.category-list { grid-template-columns: 1fr; }.topbar { align-items: flex-start; }.review-entry h2 { font-size: 16px; }.setting-row { flex-wrap: wrap; }.field-label { width: 100%; }.setting-row input[type="text"], .setting-row input:not([type]) { width: 100%; }.target-summary { align-items: flex-start; flex-wrap: wrap; gap: 9px; }.target-id { flex-basis: 100%; }.digest-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }.classification-fields { grid-column: 1 / -1; min-width: 0; }.digest-field select, .digest-field input[type="time"] { min-width: 0; width: 100%; } }
+"""
+
+
+_DELIVERY_SCRIPT = """
+document.querySelectorAll('[data-close-delivery]').forEach((button) => {
+  button.addEventListener('click', async () => {
+    if (!window.confirm('关闭这条未知结果记录？此操作保留历史，不会重发消息。')) return;
+    button.disabled = true;
+    try {
+      const response = await fetch('/api/deliveries/' + encodeURIComponent(button.dataset.closeDelivery) + '/close', {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({confirm: true}),
+      });
+      if (!response.ok) throw new Error('close failed');
+      window.location.reload();
+    } catch (error) {
+      window.alert('无法关闭记录，请刷新后重试。');
+      button.disabled = false;
+    }
+  });
+});
 """

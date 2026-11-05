@@ -21,7 +21,7 @@ from ff14_core.storage import StateStore
 
 
 class ApplicationCommandTests(unittest.TestCase):
-    def _service(self, owner_user_id: str | None = None):
+    def _service(self, owner_user_id: str | None = "owner"):
         temporary_directory = tempfile.TemporaryDirectory()
         target = TargetRef.for_onebot_group("group-test")
         config = AppConfig(database_path=Path(temporary_directory.name) / "state.sqlite3")
@@ -48,7 +48,7 @@ class ApplicationCommandTests(unittest.TestCase):
             service.handle(
                 CommandRequest(
                     target=target,
-                    actor_id="member",
+                    actor_id="owner",
                     actor_role=None,
                     text="状态",
                 )
@@ -190,7 +190,7 @@ class ApplicationCommandTests(unittest.TestCase):
             service.handle(
                 CommandRequest(
                     target=target,
-                    actor_id="member",
+                    actor_id="owner",
                     actor_role=None,
                     text="维护",
                 )

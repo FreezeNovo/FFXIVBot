@@ -85,8 +85,8 @@ class CalendarWorkflowTests(unittest.TestCase):
             self.assertEqual(workflow.plan_due(now=delayed_tick), 1)
             self.assertEqual(workflow.plan_due(now=delayed_tick), 0)
             messaging = FakeMessaging()
-            self.assertEqual(asyncio.run(workflow.dispatch_pending(messaging)), 1)
-            self.assertEqual(asyncio.run(workflow.dispatch_pending(messaging)), 0)
+            self.assertEqual(asyncio.run(workflow.dispatch_pending(messaging, now=now)), 1)
+            self.assertEqual(asyncio.run(workflow.dispatch_pending(messaging, now=now)), 0)
             self.assertEqual(len(messaging.sent), 1)
 
     def test_retryable_target_failure_does_not_block_other_targets(self) -> None:
@@ -106,10 +106,10 @@ class CalendarWorkflowTests(unittest.TestCase):
                     "group-fails": SendResult(success=False, retryable=True, error="offline")
                 }
             )
-            self.assertEqual(asyncio.run(workflow.dispatch_pending(messaging)), 2)
+            self.assertEqual(asyncio.run(workflow.dispatch_pending(messaging, now=now)), 2)
             self.assertEqual(len(messaging.sent), 2)
             self.assertEqual(len(store.list_pending_notifications()), 1)
-            self.assertEqual(asyncio.run(workflow.dispatch_pending(FakeMessaging())), 1)
+            self.assertEqual(asyncio.run(workflow.dispatch_pending(FakeMessaging(), now=now)), 1)
             self.assertEqual(len(store.list_pending_notifications()), 0)
 
     def test_provider_exception_does_not_block_other_targets(self) -> None:
@@ -126,16 +126,16 @@ class CalendarWorkflowTests(unittest.TestCase):
             self.assertEqual(workflow.plan_due(now=now), 2)
 
             messaging = RaisingMessaging("group-raises")
-            self.assertEqual(asyncio.run(workflow.dispatch_pending(messaging)), 2)
+            self.assertEqual(asyncio.run(workflow.dispatch_pending(messaging, now=now)), 2)
             self.assertEqual(len(messaging.sent), 1)
-            self.assertEqual(len(store.list_pending_notifications()), 1)
+            self.assertEqual(len(store.list_pending_notifications()), 0)
             connection = sqlite3.connect(store._database_path)
             attempts = connection.execute(
                 "SELECT success, retryable, error FROM delivery_attempt ORDER BY attempt_id"
             ).fetchall()
             connection.close()
-            self.assertEqual(attempts[0][0:2], (0, 1))
-            self.assertIn("provider disconnected", attempts[0][2])
+            self.assertEqual(attempts[0][0:2], (0, 0))
+            self.assertIn("发送结果未知", attempts[0][2])
 
     def test_schedule_uses_local_day_and_survives_workflow_restart(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -159,7 +159,7 @@ class CalendarWorkflowTests(unittest.TestCase):
             self.assertEqual(workflow.plan_due(now=due), 1)
             restarted = ActivityDigestWorkflow(store, CalendarQueryService(store))
             self.assertEqual(restarted.plan_due(now=due), 0)
-            self.assertEqual(restarted.plan_due(now=next_day), 1)
+            self.assertEqual(restarted.plan_due(now=next_day), 0)  # 同一持续故障只提示一次
 
     def test_pending_digest_candidate_updates_before_delivery(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -201,13 +201,14 @@ class CalendarWorkflowTests(unittest.TestCase):
                 message_text="摘要",
             )
             self.assertIsNotNone(notification_id)
-            store.record_delivery_attempt(
-                notification_id=notification_id,
+            store.set_activity_digest_policy(target.target_id, ActivityDigestPolicy(enabled=True))
+            claim = store.claim_notification(notification_id)
+            store.finish_delivery_attempt(claim.attempt_id, SendResult(
                 success=False,
                 retryable=False,
                 provider_message_id=None,
                 error="不支持的投递目标",
-            )
+            ))
 
             connection = sqlite3.connect(store._database_path)
             status, last_error = connection.execute(
@@ -219,7 +220,7 @@ class CalendarWorkflowTests(unittest.TestCase):
             self.assertEqual(last_error, "不支持的投递目标")
             self.assertEqual(store.list_pending_notifications(), ())
 
-    def test_removing_group_cascades_delivery_history(self) -> None:
+    def test_removing_group_preserves_delivery_history(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             store = StateStore(Path(temporary_directory) / "state.sqlite3")
             store.initialize()
@@ -231,13 +232,14 @@ class CalendarWorkflowTests(unittest.TestCase):
                 window_key="2026-08-16T20:00",
                 message_text="摘要",
             )
-            store.record_delivery_attempt(
-                notification_id=notification_id,
+            store.set_activity_digest_policy(target.target_id, ActivityDigestPolicy(enabled=True))
+            claim = store.claim_notification(notification_id)
+            store.finish_delivery_attempt(claim.attempt_id, SendResult(
                 success=True,
                 retryable=False,
                 provider_message_id="provider-1",
                 error=None,
-            )
+            ))
 
             self.assertTrue(store.delete_onebot_group("group-test"))
             connection = sqlite3.connect(store._database_path)
@@ -246,7 +248,7 @@ class CalendarWorkflowTests(unittest.TestCase):
                     "SELECT COUNT(*) FROM delivery_attempt WHERE notification_id = ?",
                     (notification_id,),
                 ).fetchone()[0],
-                0,
+                1,
             )
             connection.close()
 
@@ -278,7 +280,28 @@ class CalendarWorkflowTests(unittest.TestCase):
             ).query(target, now=datetime(2026, 8, 16, tzinfo=timezone.utc))
             rendered = ActivityDigestRenderer().render(digest)
             self.assertIn("数据源数据已超过允许新鲜度", rendered)
-            self.assertIn("当前时间窗口内没有符合本群策略的活动。", rendered)
+            self.assertIn("无法确认是否没有活动", rendered)
+
+    def test_group_digest_is_independent_of_global_calendar_filter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = StateStore(Path(tmp) / 'state.sqlite3')
+            store.initialize()
+            target = store.save_onebot_group('fixture-group', enabled=True)
+            self._record_entries(store)
+            store.set_calendar_category_included('季节活动', False)
+            digest = CalendarQueryService(store).query(target, now=datetime(2026, 8, 16, 20, tzinfo=timezone.utc))
+            self.assertTrue(digest.ongoing or digest.ending)
+            self.assertEqual(store.get_calendar_entries('2026-08-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00'), ())
+
+    def test_activity_start_is_inclusive_when_future_window_is_off(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = StateStore(Path(tmp) / 'state.sqlite3')
+            store.initialize()
+            target = store.save_onebot_group('fixture-group', enabled=True)
+            self._record_entries(store)
+            store.set_activity_digest_policy(target.target_id, ActivityDigestPolicy(upcoming_window_minutes=0, ending_window_minutes=0))
+            digest = CalendarQueryService(store).query(target, now=datetime(2026, 8, 16, 18, tzinfo=timezone.utc))
+            self.assertEqual({item.document_id for item in digest.ongoing}, {'ongoing', 'ending'})
 
     def _record_entries(self, store: StateStore) -> None:
         documents = []

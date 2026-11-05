@@ -1,0 +1,119 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:feed xmlns:ns0="http://www.w3.org/2005/Atom">
+	<ns0:title>News | FINAL FANTASY XIV, The Lodestone</ns0:title>
+	<ns0:link rel="alternate" type="text/html" href="https://na.finalfantasyxiv.com/lodestone/" />
+	<ns0:link rel="self" type="application/atom+xml" href="https://na.finalfantasyxiv.com/lodestone/news/news.xml" />
+	<ns0:id>tag:na.finalfantasyxiv.com,2023-04-01:/lodestone/news/news.xml</ns0:id>
+	<ns0:updated>2026-11-03T04:00:00Z</ns0:updated>
+	<ns0:generator uri="https://www.finalfantasyxiv.com/">FINAL FANTAXY XIV</ns0:generator>
+	
+		<ns0:entry>
+			<ns0:title>Online Store / Mog Station Maintenance (Nov. 1)</ns0:title>
+			<ns0:link rel="enclosure" href="https://lds-img.finalfantasyxiv.com/h/L/HkNRaE5rCnYnxc_V_LV6u6cc7A.png" type="image/png" />
+			<ns0:link rel="alternate" type="text/html" href="https://na.finalfantasyxiv.com/lodestone/news/detail/dd452cbe526e23a82298c2ee2ae7f6b80f0e9c85" />
+			<ns0:id>tag:na.finalfantasyxiv.com,2023-04-01:/lodestone/lodestone/news/detail/dd452cbe526e23a82298c2ee2ae7f6b80f0e9c85</ns0:id>
+
+			<ns0:published>2026-10-31T07:00:00Z</ns0:published>
+			<ns0:updated>2026-10-31T07:00:00Z</ns0:updated>
+
+			<ns0:summary>Online Store / Mog Station Maintenance (Nov. 1)</ns0:summary>
+			<ns0:author>
+				<ns0:name>FINAL FANTASY XIV, The Lodestone</ns0:name>
+			</ns0:author>
+			<ns0:category term="Maintenance" />
+			<ns0:content type="html" xml:lang="en-us" xml:base="https://na.finalfantasyxiv.com/lodestone/">Maintenance on the Online Store and Mog Station will take place at the following time, during which users may be unable to use the services listed below.&lt;br&gt;
+&lt;br&gt;
+・Online Store&lt;br&gt;
+・The following Mog Station services:&lt;br&gt;
+   - Character Renaming Service&lt;br&gt;
+   - Item code/Gift code entry&lt;br&gt;
+&lt;br&gt;
+We apologize for any inconvenience this may cause, and we thank you for your understanding.&lt;br&gt;
+&lt;br&gt;
+[Date &amp; Time]&lt;br&gt;
+Nov. 1, 2026 11:00 p.m. to Nov. 2, 2026 12:00 a.m. (PST)&lt;br&gt;
+*Completion time is subject to change.&lt;br&gt;
+&lt;br&gt;
+[Details]&lt;br&gt;
+System maintenance&lt;br&gt;
+&lt;br&gt;
+[Affected Services]&lt;br&gt;
+- Online Store&lt;br&gt;
+- Mog Station</ns0:content>
+		</ns0:entry>
+	
+		<ns0:entry>
+			<ns0:title>Actions Taken Against In-Game RMT &amp; Other Illicit Activities (Oct. 29)</ns0:title>
+			<ns0:link rel="enclosure" href="https://lds-img.finalfantasyxiv.com/h/L/HkNRaE5rCnYnxc_V_LV6u6cc7A.png" type="image/png" />
+			<ns0:link rel="alternate" type="text/html" href="https://na.finalfantasyxiv.com/lodestone/news/detail/7b40175e47638f256b6c15816d1f66d7e121eb83" />
+			<ns0:id>tag:na.finalfantasyxiv.com,2023-04-01:/lodestone/lodestone/news/detail/7b40175e47638f256b6c15816d1f66d7e121eb83</ns0:id>
+
+			<ns0:published>2026-10-29T07:00:00Z</ns0:published>
+			<ns0:updated>2026-10-29T07:00:00Z</ns0:updated>
+
+			<ns0:summary>Actions Taken Against In-Game RMT &amp; Other Illicit Activities (Oct. 29)</ns0:summary>
+			<ns0:author>
+				<ns0:name>FINAL FANTASY XIV, The Lodestone</ns0:name>
+			</ns0:author>
+			<ns0:category term="Notices" />
+			<ns0:content type="html" xml:lang="en-us" xml:base="https://na.finalfantasyxiv.com/lodestone/">Real money trading (RMT) and other illicit activities upset the balance of the game and, as such, are prohibited under the Terms of Service.&lt;br&gt;
+&lt;br&gt;
+Because we have confirmed the existence of players who are engaging in these illicit activities, we have taken the actions listed below.&lt;br&gt;
+&lt;br&gt;
+Time Period: Oct. 22, 2026 to Oct. 28, 2026&lt;br&gt;
+&lt;br&gt;
+・Participation in RMT/prohibited activities&lt;br&gt;
+　・Accounts terminated: 408&lt;br&gt;
+　・Accounts temporarily suspended: 2&lt;br&gt;
+&lt;br&gt;
+・Botting activity (excluding RMT vendors)&lt;br&gt;
+　・Accounts terminated: 6&lt;br&gt;
+　・Accounts temporarily suspended: 54&lt;br&gt;
+*Botting activity by RMT vendors has been included under "Participation in RMT/prohibited activities."&lt;br&gt;
+&lt;br&gt;
+・RMT advertising&lt;br&gt;
+　・Accounts terminated: 360&lt;br&gt;
+&lt;br&gt;
+Players who discover any confirmed cheats should, under no circumstances, exploit or disseminate such information. Instead, we ask that players file a report by using the in-game command [System Menu] -&gt; [Support Desk] -&gt; [Contact Us] -&gt; [Report Cheating].&lt;br&gt;
+&lt;br&gt;
+In addition, any witnessed RMT advertisement can be reported by right clicking the character name in the chat log and selecting the menu [Report] -&gt; [Report RMT Activity]. &lt;br&gt;
+The report will be processed automatically, and if determined to fall under RMT advertising, the reported character's comments will be restricted.&lt;br&gt;
+&lt;br&gt;
+We will continue to take stringent disciplinary action against any accounts with confirmed involvement in RMT/illicit activity; players should take care to steer clear of any activity that violates the Terms of Service.</ns0:content>
+		</ns0:entry>
+	
+		<ns0:entry>
+			<ns0:title>Mog Station Maintenance (Oct. 30)</ns0:title>
+			<ns0:link rel="enclosure" href="https://lds-img.finalfantasyxiv.com/h/L/HkNRaE5rCnYnxc_V_LV6u6cc7A.png" type="image/png" />
+			<ns0:link rel="alternate" type="text/html" href="https://na.finalfantasyxiv.com/lodestone/news/detail/67dcafc95be136e3a124a38750278fe2b0b26879" />
+			<ns0:id>tag:na.finalfantasyxiv.com,2023-04-01:/lodestone/lodestone/news/detail/67dcafc95be136e3a124a38750278fe2b0b26879</ns0:id>
+
+			<ns0:published>2026-10-28T07:00:00Z</ns0:published>
+			<ns0:updated>2026-10-28T07:00:00Z</ns0:updated>
+
+			<ns0:summary>Mog Station Maintenance (Oct. 30)</ns0:summary>
+			<ns0:author>
+				<ns0:name>FINAL FANTASY XIV, The Lodestone</ns0:name>
+			</ns0:author>
+			<ns0:category term="Maintenance" />
+			<ns0:content type="html" xml:lang="en-us" xml:base="https://na.finalfantasyxiv.com/lodestone/">The Mog Station maintenance will take place at the following time, during which users will be unable to use the services listed below.&lt;br&gt;
+&lt;br&gt;
+・Upgrading from the Free Trial to the full version of the game&lt;br&gt;
+・Adding a new service account&lt;br&gt;
+・Adding expansion packages&lt;br&gt;
+・Adding other platforms&lt;br&gt;
+&lt;br&gt;
+We apologize for any inconvenience this may cause, and we thank you for your understanding.&lt;br&gt;
+&lt;br&gt;
+[Date &amp; Time]&lt;br&gt;
+Oct. 30, 2026 12:00 a.m. to 1:00 a.m. (PDT)&lt;br&gt;
+*Completion time is subject to change.&lt;br&gt;
+&lt;br&gt;
+[Details]&lt;br&gt;
+System maintenance&lt;br&gt;
+&lt;br&gt;
+[Affected Service]&lt;br&gt;
+- Mog Station</ns0:content>
+		</ns0:entry>
+	
+		</ns0:feed>

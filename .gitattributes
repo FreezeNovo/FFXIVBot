@@ -1,0 +1,4 @@
+# Captured upstream fixtures and verbatim failure output retain their whitespace.
+tests/fixtures/p3/*.html -whitespace
+tests/fixtures/p3/*.xml -whitespace
+.scratch/p3-news-and-global/review-evidence/task13/regressions-before.log -whitespace

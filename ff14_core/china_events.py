@@ -188,6 +188,8 @@ def parse_event_candidates(
                 end_at=end.isoformat(),
                 timezone="Asia/Shanghai",
                 confidence="high",
+                precision="day",
+                time_assumption="仅日期，按Asia/Shanghai日边界显示，不具备精确提醒资格",
             )
         )
     return tuple(candidates)

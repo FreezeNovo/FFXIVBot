@@ -1,6 +1,6 @@
 [project]
 name = "ff14-qq-bot"
-version = "0.2.0"
+version = "0.3.0"
 description = "独立运行的 FF14 QQ Bot"
 readme = "GOAL.md"
 requires-python = ">=3.12"

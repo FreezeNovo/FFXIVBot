@@ -34,6 +34,10 @@ class StatusService:
     def is_owner(self, user_id: str) -> bool:
         return self._started and self._store.get_owner_user_id() == user_id
 
+    def can_query(self, target: TargetRef, feature: str) -> bool:
+        policy = self._store.get_manual_query_policy(target.target_id)
+        return policy.activity_enabled if feature == "activity" else policy.maintenance_enabled
+
     def snapshot_for_target(self, target: TargetRef) -> StatusSnapshot:
         return StatusSnapshot(
             ready=self._started,

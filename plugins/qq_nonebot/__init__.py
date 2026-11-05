@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nonebot import get_driver, on_command
-from nonebot.adapters.onebot.v11 import GROUP, Bot, GroupMessageEvent, Message
+from nonebot.adapters.onebot.v11 import GROUP, Bot, GroupMessageEvent, Message, MessageSegment
+from nonebot.adapters.onebot.v11.exception import ActionFailed
 from nonebot.params import CommandArg
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
@@ -63,6 +64,9 @@ class NoneBotMessagingPort(MessagingPort):
     def __init__(self, registry: BotConnectionRegistry) -> None:
         self._registry = registry
 
+    def is_available(self):
+        return self._registry.first() is not None
+
     async def reply(
         self, request: CommandRequest, message: OutboundMessage
     ) -> SendResult:
@@ -76,19 +80,15 @@ class NoneBotMessagingPort(MessagingPort):
         try:
             result = await context.bot.send(
                 context.event,
-                message.text,
+                MessageSegment.text(message.text),
                 at_sender=False,
             )
+        except ActionFailed as error:
+            code = getattr(error,"retcode",None)
+            return SendResult(success=False, error=f"OneBot 明确拒绝发送 retcode={code if isinstance(code,int) else 'unknown'}")
         except Exception as error:
-            return SendResult(
-                success=False,
-                retryable=True,
-                error=f"{type(error).__name__}: {error}",
-            )
-        return SendResult(
-            success=True,
-            provider_message_id=_message_id(result),
-        )
+            return SendResult(success=False, uncertain=True, error=f"{type(error).__name__}: OneBot 发送结果未知")
+        return _send_result(result)
 
     async def send_proactive(
         self, target: TargetRef, message: OutboundMessage
@@ -109,22 +109,21 @@ class NoneBotMessagingPort(MessagingPort):
         try:
             result = await bot.send_msg(
                 group_id=int(target.provider_target_id),
-                message=message.text,
+                message=MessageSegment.text(message.text),
             )
+        except ActionFailed as error:
+            code = getattr(error,"retcode",None)
+            return SendResult(success=False, error=f"OneBot 明确拒绝发送 retcode={code if isinstance(code,int) else 'unknown'}")
         except Exception as error:
-            return SendResult(
-                success=False,
-                retryable=True,
-                error=f"{type(error).__name__}: {error}",
-            )
-        return SendResult(success=True, provider_message_id=_message_id(result))
+            return SendResult(success=False, uncertain=True, error=f"{type(error).__name__}: OneBot 发送结果未知")
+        return _send_result(result)
 
 
 REGISTRY = BotConnectionRegistry()
 MESSAGING = NoneBotMessagingPort(REGISTRY)
-BACKGROUND_TASKS: set[asyncio.Task[None]] = set()
-SOURCE_POLL_INTERVAL_SECONDS = 6 * 60 * 60
-DIGEST_TICK_INTERVAL_SECONDS = 30
+from ff14_app.workers import ApplicationWorkers
+WORKERS = ApplicationWorkers(APPLICATION, MESSAGING)
+BACKGROUND_TASKS = WORKERS.tasks
 
 
 class NoneBotGateway:
@@ -137,6 +136,8 @@ class NoneBotGateway:
     async def handle_group_command(
         self, bot: Bot, event: GroupMessageEvent, args: Message
     ) -> None:
+        if not isinstance(event, GroupMessageEvent):
+            return
         target = TargetRef.for_onebot_group(str(event.group_id))
         request = CommandRequest(
             target=target,
@@ -163,35 +164,24 @@ FF14_COMMAND = on_command(
 @DRIVER.on_startup
 async def _on_startup() -> None:
     APPLICATION.start()
-    BACKGROUND_TASKS.update(
-        {
-            asyncio.create_task(_source_poll_loop()),
-            asyncio.create_task(_digest_loop()),
-        }
-    )
+    WORKERS.start()
     LOGGER.info("FFXIVBot Core 已由 NoneBot2 网关启动")
 
 
 @DRIVER.on_shutdown
 async def _on_shutdown() -> None:
-    tasks = tuple(BACKGROUND_TASKS)
-    for task in tasks:
-        task.cancel()
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
-    BACKGROUND_TASKS.clear()
-
+    await WORKERS.stop()
 
 @DRIVER.on_bot_connect
 async def _on_bot_connect(bot: Bot) -> None:
     REGISTRY.connect(bot)
-    LOGGER.info("OneBot Bot 已连接：%s", bot.self_id)
+    LOGGER.info("OneBot Bot 已连接")
 
 
 @DRIVER.on_bot_disconnect
 async def _on_bot_disconnect(bot: Bot) -> None:
     REGISTRY.disconnect(bot)
-    LOGGER.warning("OneBot Bot 已断开：%s", bot.self_id)
+    LOGGER.warning("OneBot Bot 已断开")
 
 
 @FF14_COMMAND.handle()
@@ -204,32 +194,8 @@ async def _handle_ff14_command(
         await GATEWAY.handle_group_command(bot, event, args)
 
 
-def _message_id(result: object) -> str | None:
-    if isinstance(result, dict) and result.get("message_id") is not None:
-        return str(result["message_id"])
-    return None
-
-
-async def _source_poll_loop() -> None:
-    await asyncio.sleep(5)
-    while True:
-        try:
-            await asyncio.to_thread(APPLICATION.source_service.refresh)
-            await asyncio.to_thread(
-                APPLICATION.china_detail_service.refresh_cached_documents,
-                40,
-                0.15,
-            )
-        except Exception:
-            LOGGER.exception("自动来源轮询失败；保留最后有效快照")
-        await asyncio.sleep(SOURCE_POLL_INTERVAL_SECONDS)
-
-
-async def _digest_loop() -> None:
-    while True:
-        try:
-            await APPLICATION.digest_workflow.tick(MESSAGING)
-            await APPLICATION.maintenance_workflow.tick(MESSAGING)
-        except Exception:
-            LOGGER.exception("活动摘要或维护提醒调度/投递失败")
-        await asyncio.sleep(DIGEST_TICK_INTERVAL_SECONDS)
+def _send_result(result: object) -> SendResult:
+    message_id = result.get("message_id") if isinstance(result, dict) else None
+    if isinstance(message_id, (int, str)) and not isinstance(message_id, bool) and str(message_id).strip() not in {"", "0"}:
+        return SendResult(success=True, provider_message_id=str(message_id))
+    return SendResult(success=False, uncertain=True, error="OneBot 未返回有效消息 ID，发送结果未知")

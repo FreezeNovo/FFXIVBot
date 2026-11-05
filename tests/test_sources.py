@@ -238,7 +238,7 @@ class SourceTests(unittest.TestCase):
                 "WHERE source_id = 'china_news_api' AND document_id = 'stable'"
             ).fetchone()
             connection.close()
-            self.assertEqual(status, ("empty", 0, "parser-v2"))
+            self.assertEqual(status, ("degraded", 0, "parser-v2"))
 
     def test_activity_time_update_replaces_old_candidate(self) -> None:
         document = SourceDocument(
@@ -308,7 +308,7 @@ class SourceTests(unittest.TestCase):
             candidates = store.get_event_candidates("china_news_api")
             self.assertEqual(len(candidates), 1)
             self.assertEqual(candidates[0].candidate.candidate_id, "new-time")
-            self.assertEqual(candidates[0].candidate.start_at, "2026-08-03T00:00:00+08:00")
+            self.assertEqual(candidates[0].candidate.start_at, "2026-08-02T16:00:00+00:00")
 
     def test_empty_detail_content_is_rejected(self) -> None:
         response = HttpResponse(

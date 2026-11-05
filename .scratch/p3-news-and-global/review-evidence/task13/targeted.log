@@ -1,0 +1,53 @@
+count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=failed reason=attempt=1 fixture rejection
+count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=retry reason=attempt=1 fixture offline
+count=1 stage=detail_review source=china_news_api document=0 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=1 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=11 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=10 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=12 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=13 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=15 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=14 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=16 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=17 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=19 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=18 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=2 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=20 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=22 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=21 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=23 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=24 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=25 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=26 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=27 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=28 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=29 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=3 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=30 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=31 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=32 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=33 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=34 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=35 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=36 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=37 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=38 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=39 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=4 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=5 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=6 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=7 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=8 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=9 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=retry reason=attempt=2 offline
+count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=retry reason=attempt=3 offline
+count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=uncertain reason=attempt=1 unknown
+count=1 stage=announcement source=china_news_api document=unknown target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=hold_publication_unknown reason=-
+count=1 stage=freshness source=lodestone_topics document=1 target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=exclude reason=stale
+count=1 stage=digest source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=pause reason=全部过旧或来源不可用
+count=1 stage=digest source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=recovered reason=-
+----------------------------------------------------------------------
+Ran 32 tests in 0.736s
+
+OK

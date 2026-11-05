@@ -1,4 +1,4 @@
-"""官方文章发现 PoC 的框架无关数据模型。"""
+"""官方文章、活动与三类消息策略的框架无关数据模型。"""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ class SourceDocument:
     category: str | None
     summary: str | None
     image_url: str | None
+    content_html: str | None = None
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ class ChinaNewsDetail:
 
 @dataclass(frozen=True)
 class EventCandidate:
-    """正文存在明确时间证据时生成的候选，尚未进入提醒流程。"""
+    """正文存在明确时间证据时生成的候选；投递资格由独立工作流决定。"""
 
     source_id: str
     document_id: str
@@ -65,6 +66,8 @@ class EventCandidate:
     region: str = "cn"
     created_at: str | None = None
     url: str | None = None
+    precision: str = "minute"
+    time_assumption: str = ""
 
 
 @dataclass(frozen=True)
@@ -102,6 +105,12 @@ class CalendarEntry:
     evidence_text: str
     region: str = "cn"
     classification: str = "unclassified"
+    source_id: str = "china_news_api"
+    precision: str = "minute"
+    freshness_state: str = "unverified"
+    last_verified_at: str | None = None
+    age_seconds: float | None = None
+    verification_warning: str | None = None
 
 
 @dataclass(frozen=True)
@@ -127,6 +136,12 @@ class ActivityDigestPolicy:
     upcoming_window_minutes: int = 7 * 24 * 60
     ending_window_minutes: int = 1440
 
+    regions: tuple[str, ...] | None = None
+
+    @property
+    def selected_regions(self) -> tuple[str, ...]:
+        return self.regions if self.regions is not None else (self.region,)
+
 
 @dataclass(frozen=True)
 class ActivityDigest:
@@ -138,6 +153,8 @@ class ActivityDigest:
     upcoming: tuple[CalendarEntry, ...]
     ending: tuple[CalendarEntry, ...]
     warnings: tuple[str, ...] = ()
+    excluded_count: int = 0
+    unavailable: bool = False
 
 
 @dataclass(frozen=True)
@@ -152,6 +169,12 @@ class MaintenancePolicy:
     notify_updates: bool = True
     watermark_at: str | None = None
 
+    regions: tuple[str, ...] | None = None
+
+    @property
+    def selected_regions(self) -> tuple[str, ...]:
+        return self.regions if self.regions is not None else (self.region,)
+
 
 @dataclass(frozen=True)
 class MaintenanceDigest:
@@ -162,3 +185,17 @@ class MaintenanceDigest:
     ongoing: tuple[CalendarEntry, ...]
     upcoming: tuple[CalendarEntry, ...]
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ManualQueryPolicy:
+    """普通群员的手动查询授权，独立于主动订阅。"""
+
+    activity_enabled: bool = False
+    maintenance_enabled: bool = False
+
+
+@dataclass(frozen=True)
+class MaintenanceObservation:
+    transition: str
+    version_id: str

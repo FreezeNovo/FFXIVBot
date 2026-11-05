@@ -76,6 +76,8 @@ class SendResult:
     provider_message_id: str | None = None
     retryable: bool = False
     error: str | None = None
+    # True means the provider may have accepted the message; never auto-retry.
+    uncertain: bool = False
 
 
 class MessagingPort(Protocol):

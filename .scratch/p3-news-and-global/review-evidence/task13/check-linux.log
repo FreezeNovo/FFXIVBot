@@ -1,0 +1,242 @@
+Using CPython 3.13.14
+Resolved 33 packages in 0.70ms
+Using Python 3.14.9 environment at: .venv-linux
+Checked 30 packages in 0.36ms
+All installed packages are compatible
+test_diagnostic_command_requires_owner (test_application.ApplicationCommandTests.test_diagnostic_command_requires_owner) ... ok
+test_maintenance_command_is_framework_independent (test_application.ApplicationCommandTests.test_maintenance_command_is_framework_independent) ... ok
+test_source_command_also_refreshes_china_details (test_application.ApplicationCommandTests.test_source_command_also_refreshes_china_details) ... ok
+test_source_status_command_renders_for_owner (test_application.ApplicationCommandTests.test_source_status_command_renders_for_owner) ... ok
+test_status_command_is_framework_independent (test_application.ApplicationCommandTests.test_status_command_is_framework_independent) ... ok
+test_unknown_command_is_silent (test_application.ApplicationCommandTests.test_unknown_command_is_silent) ... ok
+test_activity_start_is_inclusive_when_future_window_is_off (test_calendar.CalendarWorkflowTests.test_activity_start_is_inclusive_when_future_window_is_off) ... ok
+test_group_digest_is_independent_of_global_calendar_filter (test_calendar.CalendarWorkflowTests.test_group_digest_is_independent_of_global_calendar_filter) ... ok
+test_non_retryable_delivery_is_recorded_as_failed_not_sent (test_calendar.CalendarWorkflowTests.test_non_retryable_delivery_is_recorded_as_failed_not_sent) ... ok
+test_pending_digest_candidate_updates_before_delivery (test_calendar.CalendarWorkflowTests.test_pending_digest_candidate_updates_before_delivery) ... ok
+test_provider_exception_does_not_block_other_targets (test_calendar.CalendarWorkflowTests.test_provider_exception_does_not_block_other_targets) ... count=1 stage=digest source=- document=- target=a61ec5af-3454-51fa-a86c-c1b615e2f82e action=pause reason=全部过旧或来源不可用
+count=1 stage=digest source=- document=- target=aa976d3d-e7cc-5de3-8018-eaaddf050280 action=pause reason=全部过旧或来源不可用
+count=1 stage=delivery source=- document=- target=a61ec5af-3454-51fa-a86c-c1b615e2f82e action=uncertain reason=attempt=1 RuntimeError: 发送结果未知
+ok
+test_query_renderer_and_idempotent_delivery (test_calendar.CalendarWorkflowTests.test_query_renderer_and_idempotent_delivery) ... ok
+test_removing_group_preserves_delivery_history (test_calendar.CalendarWorkflowTests.test_removing_group_preserves_delivery_history) ... ok
+test_retryable_target_failure_does_not_block_other_targets (test_calendar.CalendarWorkflowTests.test_retryable_target_failure_does_not_block_other_targets) ... count=1 stage=digest source=- document=- target=17f19ac1-1e54-5ec4-92e4-5c53b68b02ce action=pause reason=全部过旧或来源不可用
+count=1 stage=delivery source=- document=- target=17f19ac1-1e54-5ec4-92e4-5c53b68b02ce action=retry reason=attempt=1 offline
+ok
+test_schedule_uses_local_day_and_survives_workflow_restart (test_calendar.CalendarWorkflowTests.test_schedule_uses_local_day_and_survives_workflow_restart) ... count=1 stage=digest source=- document=- target=3c63c2d1-c4b1-5b62-9bc1-a92b75d984fe action=pause reason=全部过旧或来源不可用
+ok
+test_stale_source_is_visible_in_digest_when_policy_is_configured (test_calendar.CalendarWorkflowTests.test_stale_source_is_visible_in_digest_when_policy_is_configured) ... ok
+test_category_policy_controls_calendar_and_preserves_review_page (test_calendar_policy_storage.CalendarPolicyStorageTests.test_category_policy_controls_calendar_and_preserves_review_page) ... ok
+test_notification_status_and_delivery_fk_are_migrated (test_calendar_policy_storage.CalendarPolicyStorageTests.test_notification_status_and_delivery_fk_are_migrated) ... ok
+test_old_upcoming_window_is_migrated_to_seven_days (test_calendar_policy_storage.CalendarPolicyStorageTests.test_old_upcoming_window_is_migrated_to_seven_days) ... ok
+test_v11_maintenance_policy_gains_independent_announcement_toggle (test_calendar_policy_storage.CalendarPolicyStorageTests.test_v11_maintenance_policy_gains_independent_announcement_toggle) ... ok
+test_collaboration_time_label_uses_collaboration_category (test_china_classification.ChinaClassificationTests.test_collaboration_time_label_uses_collaboration_category) ... ok
+test_collaboration_uses_one_calendar_category (test_china_classification.ChinaClassificationTests.test_collaboration_uses_one_calendar_category) ... ok
+test_live_stream_is_a_calendar_candidate (test_china_classification.ChinaClassificationTests.test_live_stream_is_a_calendar_candidate) ... ok
+test_maintenance_is_not_a_calendar_event (test_china_classification.ChinaClassificationTests.test_maintenance_is_not_a_calendar_event) ... ok
+test_monthly_card_campaign_is_a_calendar_candidate (test_china_classification.ChinaClassificationTests.test_monthly_card_campaign_is_a_calendar_candidate) ... ok
+test_operational_window_is_a_calendar_candidate (test_china_classification.ChinaClassificationTests.test_operational_window_is_a_calendar_candidate) ... ok
+test_unknown_timed_announcement_is_other_operational (test_china_classification.ChinaClassificationTests.test_unknown_timed_announcement_is_other_operational) ... ok
+test_does_not_create_range_when_only_start_time_is_explicit (test_china_events.ChinaEventParserTests.test_does_not_create_range_when_only_start_time_is_explicit) ... ok
+test_does_not_infer_start_time_from_immediately (test_china_events.ChinaEventParserTests.test_does_not_infer_start_time_from_immediately) ... ok
+test_parses_clock_words_and_cross_year_end_date (test_china_events.ChinaEventParserTests.test_parses_clock_words_and_cross_year_end_date) ... ok
+test_parses_cross_month_explicit_opening_window (test_china_events.ChinaEventParserTests.test_parses_cross_month_explicit_opening_window) ... ok
+test_parses_date_only_collaboration_window (test_china_events.ChinaEventParserTests.test_parses_date_only_collaboration_window) ... ok
+test_parses_explicit_seasonal_event_range (test_china_events.ChinaEventParserTests.test_parses_explicit_seasonal_event_range) ... ok
+test_parses_operational_window_but_marks_its_kind (test_china_events.ChinaEventParserTests.test_parses_operational_window_but_marks_its_kind) ... ok
+test_parses_same_day_maintenance_range (test_china_events.ChinaEventParserTests.test_parses_same_day_maintenance_range) ... ok
+test_failed_upgrade_retry_preserves_original_versioned_backup (test_delivery_migration.DeliveryMigrationTests.test_failed_upgrade_retry_preserves_original_versioned_backup) ... ok
+test_upgrade_preserves_attempts_holds_legacy_queue_and_restores_backup (test_delivery_migration.DeliveryMigrationTests.test_upgrade_preserves_attempts_holds_legacy_queue_and_restores_backup) ... ok
+test_real_event_permissions_and_send_outcomes (test_gateway.GatewayTests.test_real_event_permissions_and_send_outcomes) ... ok
+test_announcement_toggle_does_not_disable_reminder (test_maintenance.MaintenanceWorkflowTests.test_announcement_toggle_does_not_disable_reminder) ... ok
+test_delayed_announcement_covers_near_start_reminder (test_maintenance.MaintenanceWorkflowTests.test_delayed_announcement_covers_near_start_reminder) ... ok
+test_early_announcement_does_not_suppress_later_reminder (test_maintenance.MaintenanceWorkflowTests.test_early_announcement_does_not_suppress_later_reminder) ... ok
+test_new_maintenance_sends_immediate_without_duplicate_near_start_reminder (test_maintenance.MaintenanceWorkflowTests.test_new_maintenance_sends_immediate_without_duplicate_near_start_reminder) ... ok
+test_parser_revision_without_time_change_does_not_repeat_notice (test_maintenance.MaintenanceWorkflowTests.test_parser_revision_without_time_change_does_not_repeat_notice) ... ok
+test_pending_reminder_is_not_sent_after_maintenance_starts (test_maintenance.MaintenanceWorkflowTests.test_pending_reminder_is_not_sent_after_maintenance_starts) ... ok
+test_planner_interruption_after_observation_does_not_lose_announcement (test_maintenance.MaintenanceWorkflowTests.test_planner_interruption_after_observation_does_not_lose_announcement) ... ok
+test_preview_is_separate_from_activity_digest (test_maintenance.MaintenanceWorkflowTests.test_preview_is_separate_from_activity_digest) ... ok
+test_rejected_announcement_does_not_suppress_independent_reminder (test_maintenance.MaintenanceWorkflowTests.test_rejected_announcement_does_not_suppress_independent_reminder) ... count=1 stage=delivery source=- document=- target=57147fdb-3185-5482-a621-f624fe2b9d94 action=failed reason=attempt=1 fixture rejection
+ok
+test_time_update_supersedes_pending_old_version (test_maintenance.MaintenanceWorkflowTests.test_time_update_supersedes_pending_old_version) ... ok
+test_fake_covers_connection_proactive_and_platform_failure (test_messaging_port.MessagingPortTests.test_fake_covers_connection_proactive_and_platform_failure) ... ok
+test_fake_timeout_is_not_a_success (test_messaging_port.MessagingPortTests.test_fake_timeout_is_not_a_success) ... ok
+test_missing_source_does_not_create_files (test_migration_preview.MigrationPreviewTests.test_missing_source_does_not_create_files) ... ok
+test_preview_migrates_only_copy_and_reports_legacy_queue (test_migration_preview.MigrationPreviewTests.test_preview_migrates_only_copy_and_reports_legacy_queue) ... ok
+test_cn_pinned_pages_and_body_contract (test_p3_contracts.P3ContractTests.test_cn_pinned_pages_and_body_contract) ... ok
+test_partial_page_does_not_become_success (test_p3_contracts.P3ContractTests.test_partial_page_does_not_become_success) ... ok
+test_two_distinct_atom_feeds_have_body_and_stable_ids (test_p3_contracts.P3ContractTests.test_two_distinct_atom_feeds_have_body_and_stable_ids) ... ok
+test_sensitive_markers_filtered_and_rotation_bounded (test_p3_diagnostics.DiagnosticTests.test_sensitive_markers_filtered_and_rotation_bounded) ... 2026-11-05 11:34:11,880Z WARNING count=1 stage=fixture source=china_news_api document=fixture-id target=internal-uuid action=preserve reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,880Z ERROR fixture outer failure TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_diagnostics.py", line 19, in test_sensitive_markers_filtered_and_rotation_bounded
+    try:raise TimeoutError(raw)
+        ^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,880Z WARNING count=1 stage=fixture source=fixture document=0 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,880Z WARNING count=1 stage=fixture source=fixture document=1 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,880Z WARNING count=1 stage=fixture source=fixture document=2 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=3 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=4 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=5 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=6 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=7 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=8 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=9 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=10 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=11 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=12 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=13 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=14 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=15 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=16 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=17 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=18 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=19 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=20 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=21 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=22 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=23 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,881Z WARNING count=1 stage=fixture source=fixture document=24 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,882Z WARNING count=1 stage=fixture source=fixture document=25 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,882Z WARNING count=1 stage=fixture source=fixture document=26 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,882Z WARNING count=1 stage=fixture source=fixture document=27 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,882Z WARNING count=1 stage=fixture source=fixture document=28 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+2026-11-05 11:34:11,882Z WARNING count=1 stage=fixture source=fixture document=29 target=- action=rotate reason=TimeoutError [URI已隐藏] [敏感字段已隐藏] [敏感字段已隐藏] {'[敏感字段已隐藏]', '[敏感字段已隐藏]'}
+ok
+test_versions_format_title_images_links_return_and_normalizer_upgrade (test_p3_documents.DocumentVersionTests.test_versions_format_title_images_links_return_and_normalizer_upgrade) ... ok
+test_intermediate_versions_retry_and_original_backup_immutable (test_p3_migration.P3MigrationTests.test_intermediate_versions_retry_and_original_backup_immutable) ... ok
+test_real_structural_stages_upgrade_continuously_16_through_22 (test_p3_migration.P3MigrationTests.test_real_structural_stages_upgrade_continuously_16_through_22) ... ok
+test_schema16_preview_preserves_state_and_restore_then_repeat (test_p3_migration.P3MigrationTests.test_schema16_preview_preserves_state_and_restore_then_repeat) ... ok
+test_48_72_boundaries_manual_retains_and_once_pause_recovers (test_p3_na_freshness.NAFreshnessTests.test_48_72_boundaries_manual_retains_and_once_pause_recovers) ... count=1 stage=freshness source=lodestone_topics document=1 target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=exclude reason=stale
+count=1 stage=digest source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=pause reason=全部过旧或来源不可用
+count=1 stage=digest source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=recovered reason=-
+ok
+test_date_only_is_auditable_without_precise_candidate (test_p3_na_freshness.NAFreshnessTests.test_date_only_is_auditable_without_precise_candidate) ... ok
+test_detail_304_requires_corresponding_validator_and_refreshes_only_its_event (test_p3_na_freshness.NAFreshnessTests.test_detail_304_requires_corresponding_validator_and_refreshes_only_its_event) ... ok
+test_display_is_beijing_even_with_other_host_timezone (test_p3_na_freshness.NAFreshnessTests.test_display_is_beijing_even_with_other_host_timezone) ... ok
+test_normal_empty_does_not_send_but_manual_explains (test_p3_na_freshness.NAFreshnessTests.test_normal_empty_does_not_send_but_manual_explains) ... ok
+test_real_maintenance_body_crossmonth_and_feed_topics (test_p3_na_freshness.NAFreshnessTests.test_real_maintenance_body_crossmonth_and_feed_topics) ... ok
+test_synthetic_parser_boundaries_no_time_timezone_date_only_and_dst (test_p3_na_freshness.NAFreshnessTests.test_synthetic_parser_boundaries_no_time_timezone_date_only_and_dst) ... ok
+test_unchanged_reparse_preserves_first_observation_time (test_p3_na_freshness.NAFreshnessTests.test_unchanged_reparse_preserves_first_observation_time) ... ok
+test_unchanged_success_zero_parse_failure_and_recovery (test_p3_na_freshness.NAFreshnessTests.test_unchanged_success_zero_parse_failure_and_recovery) ... ok
+test_unstarted_delayed_digest_rechecks_age_before_claim (test_p3_na_freshness.NAFreshnessTests.test_unstarted_delayed_digest_rechecks_age_before_claim) ... ok
+test_added_scope_keeps_original_watermark_and_maintenance_separate (test_p3_news.NewsWorkflowTests.test_added_scope_keeps_original_watermark_and_maintenance_separate) ... ok
+test_daily_digest_is_one_window_and_late_articles_wait_next_day (test_p3_news.NewsWorkflowTests.test_daily_digest_is_one_window_and_late_articles_wait_next_day) ... ok
+test_digest_empty_and_recovery_72h_inclusive (test_p3_news.NewsWorkflowTests.test_digest_empty_and_recovery_72h_inclusive) ... count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=retry reason=attempt=2 offline
+count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=retry reason=attempt=3 offline
+ok
+test_disable_reenable_scope_and_uncertain_no_repack (test_p3_news.NewsWorkflowTests.test_disable_reenable_scope_and_uncertain_no_repack) ... count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=uncertain reason=attempt=1 unknown
+ok
+test_incomplete_observation_is_recoverable_and_known_maintenance_is_separate (test_p3_news.NewsWorkflowTests.test_incomplete_observation_is_recoverable_and_known_maintenance_is_separate) ... ok
+test_new_old_missing_publication_baseline_and_restart (test_p3_news.NewsWorkflowTests.test_new_old_missing_publication_baseline_and_restart) ... count=1 stage=announcement source=china_news_api document=unknown target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=hold_publication_unknown reason=-
+ok
+test_normalizer_upgrade_does_not_notify_but_later_content_does (test_p3_news.NewsWorkflowTests.test_normalizer_upgrade_does_not_notify_but_later_content_does) ... ok
+test_partial_batch_unknown_restart_and_policy_removes_one_region (test_p3_news.NewsWorkflowTests.test_partial_batch_unknown_restart_and_policy_removes_one_region) ... ok
+test_pending_versions_net_change_and_return_after_success (test_p3_news.NewsWorkflowTests.test_pending_versions_net_change_and_return_after_success) ... ok
+test_preflight_merges_groups_does_not_wait_at_deadline_and_late_result_no_second (test_p3_preflight.PreflightTests.test_preflight_merges_groups_does_not_wait_at_deadline_and_late_result_no_second) ... ok
+test_restart_recovers_reserved_window_and_schedule_change_rechecks (test_p3_preflight.PreflightTests.test_restart_recovers_reserved_window_and_schedule_change_rechecks) ... ok
+test_stop_discards_thread_response (test_p3_preflight.PreflightTests.test_stop_discards_thread_response) ... ok
+test_provider_same_document_id_has_distinct_maintenance_observation (test_p3_regions.RegionPolicyTests.test_provider_same_document_id_has_distinct_maintenance_observation) ... ok
+test_ui_three_independent_sets_and_claim_removes_region (test_p3_regions.RegionPolicyTests.test_ui_three_independent_sets_and_claim_removes_region) ... ok
+test_frozen_page_format_change_does_not_duplicate_its_article (test_p3_review_corrections.AnnouncementReviewTests.test_frozen_page_format_change_does_not_duplicate_its_article) ... ok
+test_frozen_real_change_is_a_successor_after_original_confirmation (test_p3_review_corrections.AnnouncementReviewTests.test_frozen_real_change_is_a_successor_after_original_confirmation) ... ok
+test_old_failed_content_does_not_suppress_a_genuine_return_after_success (test_p3_review_corrections.AnnouncementReviewTests.test_old_failed_content_does_not_suppress_a_genuine_return_after_success) ... count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=failed reason=attempt=1 fixture rejection
+ok
+test_real_update_after_expired_first_publication_uses_observation_time (test_p3_review_corrections.AnnouncementReviewTests.test_real_update_after_expired_first_publication_uses_observation_time) ... ok
+test_update_merge_and_retry_do_not_extend_one_eligibility_window (test_p3_review_corrections.AnnouncementReviewTests.test_update_merge_and_retry_do_not_extend_one_eligibility_window) ... count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=retry reason=attempt=1 fixture offline
+ok
+test_equivalent_void_syntax_preserves_body_candidates_and_comparison (test_p3_review_corrections.BodyVoidTagTests.test_equivalent_void_syntax_preserves_body_candidates_and_comparison) ... ok
+test_repeated_cn_failures_allow_initial_and_old_na_body_verification (test_p3_review_corrections.ReviewFairnessIntegrationTests.test_repeated_cn_failures_allow_initial_and_old_na_body_verification) ... count=1 stage=detail_review source=china_news_api document=0 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=1 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=11 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=10 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=12 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=13 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=14 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=15 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=16 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=17 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=2 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=19 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=18 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=20 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=23 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=22 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=21 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=24 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=25 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=26 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=27 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=28 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=30 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=3 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=29 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=31 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=34 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=33 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=32 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=35 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=38 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=37 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=36 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=39 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=6 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=5 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=4 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=7 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=8 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+count=1 stage=detail_review source=china_news_api document=9 target=- action=preserve_last_valid reason=TimeoutError: fixture persistent failure
+ok
+test_failing_cn_backlog_does_not_starve_na_first_or_known_details (test_p3_review_corrections.ReviewFairnessTests.test_failing_cn_backlog_does_not_starve_na_first_or_known_details) ... ok
+test_saturated_and_single_source_queues_keep_one_total_budget (test_p3_review_corrections.ReviewFairnessTests.test_saturated_and_single_source_queues_keep_one_total_budget) ... ok
+test_ui_to_persistent_cadence_restart_overlap_and_settings_validation (test_p3_workers.WorkerTests.test_ui_to_persistent_cadence_restart_overlap_and_settings_validation) ... ok
+test_accepted_send_with_lost_response_is_not_retried (test_reliability_regressions.ReliabilityRegressionTests.test_accepted_send_with_lost_response_is_not_retried) ... count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=uncertain reason=attempt=1 TimeoutError: 发送结果未知
+ok
+test_concurrent_wakeups_only_claim_once (test_reliability_regressions.ReliabilityRegressionTests.test_concurrent_wakeups_only_claim_once) ... ok
+test_digest_does_not_replay_previous_day (test_reliability_regressions.ReliabilityRegressionTests.test_digest_does_not_replay_previous_day) ... ok
+test_disabled_activity_policy_stops_pending_messages (test_reliability_regressions.ReliabilityRegressionTests.test_disabled_activity_policy_stops_pending_messages) ... ok
+test_disabled_maintenance_policy_stops_pending_messages (test_reliability_regressions.ReliabilityRegressionTests.test_disabled_maintenance_policy_stops_pending_messages) ... ok
+test_disabling_during_unsent_attempt_prevents_replay_on_reenable (test_reliability_regressions.ReliabilityRegressionTests.test_disabling_during_unsent_attempt_prevents_replay_on_reenable) ... count=1 stage=delivery source=- document=- target=a6ab8cb6-ba0f-5dfe-bd43-9e1ece50a2e7 action=retry reason=attempt=1 fixture definitely not sent
+ok
+test_expired_candidates_do_not_send (test_reliability_regressions.ReliabilityRegressionTests.test_expired_candidates_do_not_send) ... ok
+test_interrupted_attempt_is_persisted_and_held_on_restart (test_reliability_regressions.ReliabilityRegressionTests.test_interrupted_attempt_is_persisted_and_held_on_restart) ... ok
+test_legacy_successful_daily_window_is_not_sent_again (test_reliability_regressions.ReliabilityRegressionTests.test_legacy_successful_daily_window_is_not_sent_again) ... ok
+test_member_query_permissions_are_independent_and_take_effect_immediately (test_reliability_regressions.ReliabilityRegressionTests.test_member_query_permissions_are_independent_and_take_effect_immediately) ... ok
+test_readding_archived_group_preserves_history_and_resets_subscriptions (test_reliability_regressions.ReliabilityRegressionTests.test_readding_archived_group_preserves_history_and_resets_subscriptions) ... ok
+test_removing_group_preserves_delivery_history (test_reliability_regressions.ReliabilityRegressionTests.test_removing_group_preserves_delivery_history) ... ok
+test_renderer_splits_a_single_oversized_line (test_reliability_regressions.ReliabilityRegressionTests.test_renderer_splits_a_single_oversized_line) ... ok
+test_schedule_edit_does_not_send_second_daily_digest (test_reliability_regressions.ReliabilityRegressionTests.test_schedule_edit_does_not_send_second_daily_digest) ... ok
+test_schema_from_newer_application_is_not_downgraded (test_reliability_regressions.ReliabilityRegressionTests.test_schema_from_newer_application_is_not_downgraded) ... ok
+test_shrinking_and_growing_pending_digest_pages_does_not_send_old_pages (test_reliability_regressions.ReliabilityRegressionTests.test_shrinking_and_growing_pending_digest_pages_does_not_send_old_pages) ... ok
+test_status_and_aliases_require_configured_owner (test_reliability_regressions.ReliabilityRegressionTests.test_status_and_aliases_require_configured_owner) ... ok
+test_loopback_routes_startup_and_shutdown_without_external_connections (test_runtime_lifecycle.RuntimeLifecycleTests.test_loopback_routes_startup_and_shutdown_without_external_connections) ... ok
+test_second_process_is_rejected_and_lock_releases_after_exit (test_runtime_lock.RuntimeLockTests.test_second_process_is_rejected_and_lock_releases_after_exit) ... ok
+test_activity_time_update_replaces_old_candidate (test_sources.SourceTests.test_activity_time_update_replaces_old_candidate) ... ok
+test_china_news_api_merges_pages_and_deduplicates_article_ids (test_sources.SourceTests.test_china_news_api_merges_pages_and_deduplicates_article_ids) ... ok
+test_china_news_api_parses_official_article_metadata (test_sources.SourceTests.test_china_news_api_parses_official_article_metadata) ... ok
+test_china_news_schema_drift_is_rejected (test_sources.SourceTests.test_china_news_schema_drift_is_rejected) ... ok
+test_conditional_304_keeps_cached_documents (test_sources.SourceTests.test_conditional_304_keeps_cached_documents) ... ok
+test_detail_refresh_renders_failure_reason (test_sources.SourceTests.test_detail_refresh_renders_failure_reason) ... ok
+test_empty_detail_content_is_rejected (test_sources.SourceTests.test_empty_detail_content_is_rejected) ... ok
+test_failed_refresh_keeps_last_successful_document (test_sources.SourceTests.test_failed_refresh_keeps_last_successful_document) ... count=1 stage=discovery source=fixture_source document=- target=- action=preserve_snapshot reason=RuntimeError: offline
+ok
+test_first_detail_failure_is_persisted (test_sources.SourceTests.test_first_detail_failure_is_persisted) ... ok
+test_lodestone_atom_parses_article_metadata (test_sources.SourceTests.test_lodestone_atom_parses_article_metadata) ... ok
+test_lodestone_schema_drift_is_rejected (test_sources.SourceTests.test_lodestone_schema_drift_is_rejected) ... ok
+test_parser_version_change_reopens_unchanged_detail (test_sources.SourceTests.test_parser_version_change_reopens_unchanged_detail) ... ok
+test_saved_official_source_fixtures_match_contracts (test_sources.SourceTests.test_saved_official_source_fixtures_match_contracts) ... ok
+test_sqlite_backup_and_wal_integrity (test_sources.SourceTests.test_sqlite_backup_and_wal_integrity) ... ok
+test_zero_candidate_parse_preserves_last_known_candidate (test_sources.SourceTests.test_zero_candidate_parse_preserves_last_known_candidate) ... ok
+test_only_configured_group_is_enabled (test_status_service.StatusServiceTests.test_only_configured_group_is_enabled) ... ok
+test_owner_and_target_changes_take_effect_without_restart (test_status_service.StatusServiceTests.test_owner_and_target_changes_take_effect_without_restart) ... ok
+test_status_text_exposes_only_current_minimal_capabilities (test_status_service.StatusServiceTests.test_status_text_exposes_only_current_minimal_capabilities) ... ok
+test_access_routes_manage_owner_and_groups (test_web_access.WebAccessTests.test_access_routes_manage_owner_and_groups) ... ok
+test_access_routes_reject_non_numeric_identifiers (test_web_access.WebAccessTests.test_access_routes_reject_non_numeric_identifiers) ... ok
+test_calendar_category_controls_have_unique_dom_ids (test_web_access.WebAccessTests.test_calendar_category_controls_have_unique_dom_ids) ... ok
+test_query_policy_and_uncertain_delivery_review (test_web_access.WebAccessTests.test_query_policy_and_uncertain_delivery_review) ... ok
+test_review_page_is_reachable (test_web_access.WebAccessTests.test_review_page_is_reachable) ... ok
+
+----------------------------------------------------------------------
+Ran 136 tests in 2.497s
+
+OK

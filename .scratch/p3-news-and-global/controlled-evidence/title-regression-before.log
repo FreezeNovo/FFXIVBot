@@ -1,0 +1,19 @@
+test_topic_page_heading_is_not_part_of_official_article_title (test_p3_live_findings.LiveFindingTests.test_topic_page_heading_is_not_part_of_official_article_title) ... FAIL
+
+======================================================================
+FAIL: test_topic_page_heading_is_not_part_of_official_article_title (test_p3_live_findings.LiveFindingTests.test_topic_page_heading_is_not_part_of_official_article_title)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/windows-data/WindowsBackup/Users/NovoMeow/Documents/FFXIVBot/tests/test_p3_live_findings.py", line 21, in test_topic_page_heading_is_not_part_of_official_article_title
+    self.assertEqual(parser.title,expected)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'TopicsPresenting the Fan Festival 2026 in Tokyo Stage & Stream Schedule' != 'Presenting the Fan Festival 2026 in Tokyo Stage & Stream Schedule'
+- TopicsPresenting the Fan Festival 2026 in Tokyo Stage & Stream Schedule
+? ------
++ Presenting the Fan Festival 2026 in Tokyo Stage & Stream Schedule
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.008s
+
+FAILED (failures=1)

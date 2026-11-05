@@ -10,6 +10,8 @@ from ff14_core.storage import StateStore
 from ff14_core.source_models import CalendarCategoryOption
 from ff14_web.app import (
     ActivityPolicyUpdate,
+    ManualQueryPolicyUpdate,
+    DeliveryCloseRequest,
     MaintenancePolicyUpdate,
     OwnerUpdate,
     TargetUpdate,
@@ -169,6 +171,39 @@ class WebAccessTests(unittest.TestCase):
             response = review_routes[0].endpoint(page=1)
             self.assertEqual(response.status_code, 200)
             self.assertIn("待审核活动", response.body.decode("utf-8"))
+
+    def test_query_policy_and_uncertain_delivery_review(self):
+        from ff14_core.source_models import ActivityDigestPolicy
+        from ff14_core.messaging import SendResult
+        with tempfile.TemporaryDirectory() as tmp:
+            store = StateStore(Path(tmp) / 'test.sqlite3')
+            store.initialize()
+            target = store.save_onebot_group('67890', enabled=True)
+            store.set_activity_digest_policy(target.target_id, ActivityDigestPolicy(enabled=True))
+            app = create_app(store)
+            routes = {getattr(route, 'path', ''): getattr(route, 'endpoint', None) for route in app.routes}
+            update = routes['/api/access-settings/groups/{group_id}/query-policy']
+            self.assertEqual(update('67890', ManualQueryPolicyUpdate(activity_enabled=True, maintenance_enabled=False)),
+                             {'activity_enabled':True, 'maintenance_enabled':False})
+            settings = routes['/api/access-settings']()
+            self.assertTrue(settings['targets'][0]['manual_queries']['activity_enabled'])
+            self.assertIn('data-query-activity checked', routes['/access']().body.decode())
+            with self.assertRaises(HTTPException):
+                update('11111', ManualQueryPolicyUpdate(activity_enabled=True, maintenance_enabled=True))
+            notification = store.create_notification_candidate(business_key='web-review', target_id=target.target_id,
+                stream='activity_digest', window_key='fixture', message_text='<script>fixture</script>')
+            claim = store.claim_notification(notification)
+            store.finish_delivery_attempt(claim.attempt_id, SendResult(success=False, uncertain=True))
+            body = routes['/deliveries']().body.decode()
+            self.assertIn('结果未知，需核查', body)
+            self.assertIn('&lt;script&gt;fixture&lt;/script&gt;', body)
+            close = routes['/api/deliveries/{notification_id}/close']
+            with self.assertRaises(HTTPException):
+                close(notification, DeliveryCloseRequest(confirm=False))
+            self.assertEqual(close(notification, DeliveryCloseRequest(confirm=True)), {'closed':True})
+            self.assertEqual(store.list_deliveries()[0].status, 'failed')
+            with self.assertRaises(HTTPException):
+                close(notification, DeliveryCloseRequest(confirm=True))
 
 
 if __name__ == "__main__":

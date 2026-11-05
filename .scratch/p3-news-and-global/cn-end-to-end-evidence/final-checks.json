@@ -1,0 +1,16 @@
+{
+  "candidate_files_scanned": 138,
+  "sensitive_literal_matches": 0,
+  "unexpected_private_paths": 0,
+  "unexpected_binary_files": 0,
+  "markdown_files": 39,
+  "local_links_checked": 250,
+  "invalid_local_links": 0,
+  "project_and_virtual_lock_version": "0.3.0",
+  "third_party_lock_unchanged": true,
+  "full_offline_tests": 137,
+  "production_hash_unchanged": true,
+  "production_integrity": "ok",
+  "private_artifacts_ignored": true,
+  "git_remote_configured": false
+}

@@ -1,0 +1,79 @@
+{
+  "collection": {
+    "prepared_at": "2026-11-05T14:55:45.088388+00:00",
+    "source_id": "china_news_api",
+    "source_document_count": 20,
+    "source_list_success": true,
+    "document_id": "394997",
+    "title": "8.0版本抢先体验典藏包 超5折开售！",
+    "published_at": "2026/11/04 17:00:00",
+    "category": "5310",
+    "official_url": "https://ff.web.sdo.com/web8/index.html#/newstab/newscont/394997",
+    "version_id": 1,
+    "normalized_body_characters": 735,
+    "body_nonempty": true,
+    "activity_candidates": 0,
+    "logical_http_gets": 2,
+    "production_unchanged_after_collection": true,
+    "fixture_or_cached_document_copy_used": false,
+    "synthetic_content_used": false,
+    "schema": "22"
+  },
+  "delivery": {
+    "started_at": "2026-11-05T14:58:01.887016+00:00",
+    "message_budget": 1,
+    "send_calls": 1,
+    "provider_readbacks": 1,
+    "checks": {
+      "production_unchanged_since_collection": true,
+      "no_remote_competing_gateway": true,
+      "remote_provider_running": true,
+      "normal_new_subscription_does_not_backfill": true,
+      "article_is_within_72_hour_window": true,
+      "exactly_one_normal_announcement_candidate": true,
+      "candidate_contains_only_selected_actual_article": true,
+      "preview_does_not_create_delivery": true,
+      "actual_bot_matches_authorized_account": true,
+      "provider_online_good": true,
+      "actual_group_matches_authorized_target": true,
+      "attempt_persisted_before_provider_send": true,
+      "workflow_tick_attempts_once": true,
+      "one_provider_send_call": true,
+      "provider_readback_exact_text": true,
+      "provider_readback_message_identity": true,
+      "provider_readback_target": true,
+      "ledger_single_sent_delivery": true,
+      "duplicate_tick_no_send": true,
+      "service_restart_no_duplicate": true,
+      "test_database_integrity": true,
+      "test_connections_closed": true,
+      "background_jobs_absent": true,
+      "isolated_policy_disabled": true,
+      "production_database_unchanged": true,
+      "runtime_lock_reacquired": true
+    },
+    "completed": true,
+    "remote_before": {
+      "FfxivGatewayCount": 0,
+      "NapCatRunning": true,
+      "QqRunning": true
+    },
+    "ended_at": "2026-11-05T14:58:08.774964+00:00",
+    "remote_after": {
+      "FfxivGatewayCount": 0,
+      "NapCatRunning": true,
+      "QqRunning": true
+    }
+  },
+  "human_confirmation": {
+    "confirmed_at": "2026-11-05T15:00:03.327382+00:00",
+    "client_message_visible": true,
+    "title_excerpt_and_link_normal": true
+  },
+  "scope": "one freshly collected real CN article, labelled replay; isolated database; no production deployment",
+  "non_product_tool_failure": {
+    "first_preflight": "Windows subprocess output decoding failed before connecting QQ or sending",
+    "first_preflight_send_calls": 0,
+    "correction": "UTF-8 output and explicit decoding in temporary read-only checker"
+  }
+}

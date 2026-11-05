@@ -1,0 +1,14 @@
+{
+  "markdown_files_checked": 34,
+  "local_links_checked": 234,
+  "invalid_links": 0,
+  "sensitive_literal_matches": 0,
+  "public_files_scanned": 49,
+  "git_diff_check": "passed",
+  "linux_script_syntax": "passed",
+  "python_compileall": "passed",
+  "production_integrity": "ok",
+  "production_foreign_key_errors": 0,
+  "private_run_ignored": true,
+  "private_file_permissions": "owner-only"
+}

@@ -9,6 +9,8 @@ import hashlib
 import json
 import random
 import time
+import threading
+from dataclasses import replace
 from dataclasses import dataclass, field
 from typing import Mapping, Protocol
 from urllib.error import HTTPError, URLError
@@ -19,6 +21,7 @@ from .china_classification import classify_event_candidate
 from .china_events import PARSER_VERSION, extract_plain_text, parse_event_candidates
 from .source_models import ChinaNewsDetail, SourceDocument, SourceHealth
 from .storage import StateStore
+from .diagnostics import safe_reason, diagnostic
 
 
 CHINA_NEWS_CENTER_URL = "https://ff.web.sdo.com/web8/index.html#/newstab/newslist"
@@ -26,6 +29,7 @@ CHINA_NEWS_DETAIL_PAGE_URL = "https://ff.web.sdo.com/web8/index.html#/newstab/ne
 CHINA_NEWS_PAGE_SIZE = 20
 DEFAULT_CHINA_PAGE_COUNT = 5
 CHINA_NEWS_CATEGORY_CODES = "8324,8325,8326,8327,5309,5310,5311,5312,5313"
+LODESTONE_TOPICS_URL = "https://na.finalfantasyxiv.com/lodestone/news/topics.xml"
 LODESTONE_NEWS_URL = "https://na.finalfantasyxiv.com/lodestone/news/news.xml"
 CHINA_NEWS_DETAIL_URL = "https://cqnews.web.sdo.com/api/news/newsDetail?gameCode=ff&id={document_id}"
 ATOM_NAMESPACE = "http://www.w3.org/2005/Atom"
@@ -79,7 +83,7 @@ class UrllibHttpTransport:
         *,
         proxy_url: str | None = None,
         max_attempts: int = 3,
-        user_agent: str = "FF14QQBot/0.1 official-source",
+        user_agent: str = "FFXIVBot/0.3.0 official-source",
     ) -> None:
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
@@ -298,8 +302,13 @@ class LodestoneAtomSource:
     source_id = "lodestone_atom"
     display_name = "Lodestone Atom"
 
+    def __init__(self, *, topics=False):
+        self.url = LODESTONE_TOPICS_URL if topics else LODESTONE_NEWS_URL
+        self.source_id = "lodestone_topics" if topics else "lodestone_atom"
+        self.display_name = "Lodestone Topics" if topics else "Lodestone Atom"
+
     def fetch(self, transport: HttpTransport) -> SourceFetchResult:
-        response = transport.get(LODESTONE_NEWS_URL)
+        response = transport.get(self.url)
         if response.status_code == 304:
             return SourceFetchResult(
                 source_id=self.source_id,
@@ -322,7 +331,9 @@ class LodestoneAtomSource:
         for entry in root.findall("atom:entry", namespace):
             atom_id = _element_text(entry, "atom:id", namespace)
             if not atom_id:
-                continue
+                raise ValueError("Lodestone Atom entry缺少稳定id")
+            if not _element_text(entry,"atom:title",namespace) or _alternate_link(entry)==LODESTONE_NEWS_URL:
+                raise ValueError("Lodestone Atom entry缺少标题或官方详情链接")
             documents.append(
                 SourceDocument(
                     source_id=self.source_id,
@@ -334,6 +345,7 @@ class LodestoneAtomSource:
                     category=_category_term(entry),
                     summary=_element_text(entry, "atom:summary", namespace),
                     image_url=_enclosure_link(entry),
+                    content_html=_element_text(entry, "atom:content", namespace),
                 )
             )
         if not documents:
@@ -371,11 +383,18 @@ class OfficialSourceService:
     ) -> None:
         self._store = store
         self._transport = transport or UrllibHttpTransport()
-        self._adapters = adapters or (ChinaNewsApiSource(), LodestoneAtomSource())
+        self._adapters = adapters or (ChinaNewsApiSource(), LodestoneAtomSource(), LodestoneAtomSource(topics=True))
+        self._lock = threading.Lock()
+        self.stopped = threading.Event()
 
     def refresh(self) -> tuple[SourceRefreshResult, ...]:
+        with self._lock:
+            return self._refresh()
+
+    def _refresh(self) -> tuple[SourceRefreshResult, ...]:
         results: list[SourceRefreshResult] = []
         for adapter in self._adapters:
+            if self.stopped.is_set():break
             try:
                 etag, last_modified = self._store.get_source_validators(adapter.source_id)
                 fetched = adapter.fetch(
@@ -385,6 +404,8 @@ class OfficialSourceService:
                         last_modified=last_modified,
                     )
                 )
+                if self.stopped.is_set():
+                    return tuple(results)
                 not_modified = bool(getattr(fetched, "not_modified", False))
                 if not_modified:
                     self._store.record_source_not_modified(
@@ -403,6 +424,18 @@ class OfficialSourceService:
                         etag=getattr(fetched, "etag", None),
                         last_modified=getattr(fetched, "last_modified", None),
                     )
+                if not not_modified:
+                    for document in fetched.documents:
+                        if document.source_id in {"lodestone_atom","lodestone_topics"} and not document.content_html:
+                            self._store.record_detail_parse_failure(source_id=document.source_id,document_id=document.document_id,error="Atom entry缺少正文，保留最后有效版本并等待详情复查")
+                            diagnostic(stage="atom_body",source_id=document.source_id,document_id=document.document_id,action="preserve_last_valid",error="missing_content")
+                        if document.content_html:
+                            version_id=self._store.record_document_version(document, document.content_html,ready=False)
+                            if document.source_id in {"lodestone_atom","lodestone_topics"}:
+                                from .na_events import parse_na_candidates, date_only_evidence, PARSER_VERSION as NA_VERSION
+                                self._store.record_time_evidence(version_id,date_only_evidence(document,document.content_html))
+                                detail=ChinaNewsDetail(document.source_id,document.document_id,document.title,document.published_at,document.content_html,extract_plain_text(document.content_html))
+                                self._store.record_china_detail_success(detail,parse_na_candidates(document,document.content_html),NA_VERSION)
                 results.append(
                     SourceRefreshResult(
                         source_id=fetched.source_id,
@@ -418,11 +451,14 @@ class OfficialSourceService:
                     )
                 )
             except Exception as error:
+                if self.stopped.is_set():break
                 message = _error_summary(error)
+                diagnostic(stage="discovery",source_id=adapter.source_id,action="preserve_snapshot",error=message)
                 self._store.record_source_failure(
                     source_id=adapter.source_id,
                     display_name=adapter.display_name,
                     error=message,
+                    http_status=getattr(error,"status_code",None),
                 )
                 results.append(
                     SourceRefreshResult(
@@ -509,8 +545,20 @@ class ChinaNewsDetailService:
         self._store = store
         self._transport = transport or UrllibHttpTransport()
         self._detail_api = detail_api or ChinaNewsDetailApi()
+        self._document_locks = {}
+        self._document_locks_guard = threading.Lock()
+        self._lock = threading.Lock()
+        self.stopped = threading.Event()
 
     def refresh_cached_documents(
+        self,
+        limit: int = 10,
+        pause_seconds: float = 0.0,
+    ) -> ChinaDetailRefreshResult:
+        with self._lock:
+            return self._refresh_cached_documents(limit, pause_seconds)
+
+    def _refresh_cached_documents(
         self,
         limit: int = 10,
         pause_seconds: float = 0.0,
@@ -531,33 +579,10 @@ class ChinaNewsDetailService:
             if index and pause_seconds:
                 time.sleep(pause_seconds)
             try:
-                detail = self._detail_api.fetch(self._transport, document.document_id)
-                content_hash = hashlib.sha256(
-                    detail.content_html.encode("utf-8")
-                ).hexdigest()
-                if (
-                    self._store.get_detail_content_hash(
-                        detail.source_id, detail.document_id
-                    )
-                    == content_hash
-                    and self._store.get_detail_parser_version(
-                        detail.source_id, detail.document_id
-                    )
-                    == PARSER_VERSION
-                ):
-                    successes += 1
-                    continue
-                parsed_candidates = parse_event_candidates(
-                    source_id=detail.source_id,
-                    document_id=detail.document_id,
-                    title=detail.title,
-                    content_text=detail.content_text,
-                )
-                candidates = tuple(classify_event_candidate(item) for item in parsed_candidates)
-                self._store.record_china_detail_success(detail, candidates, PARSER_VERSION)
+                candidate_count += self.refresh_document(document)
                 successes += 1
-                candidate_count += len(candidates)
             except Exception as error:
+                if self.stopped.is_set():break
                 failures += 1
                 last_error = _error_summary(error)
                 self._store.record_detail_parse_failure(
@@ -593,6 +618,49 @@ class ChinaNewsDetailService:
             failures=tuple(detail_failures),
         )
 
+    def refresh_document(self, document):
+        with self._document_locks_guard:
+            lock = self._document_locks.setdefault((document.source_id, document.document_id), threading.Lock())
+        with lock:
+            if self.stopped.is_set():return 0
+            return self._refresh_document(document)
+
+    def _refresh_document(self, document):
+        self._store.record_verification_attempt(document.source_id,document.document_id)
+        detail = self._detail_api.fetch(self._transport, document.document_id)
+        if self.stopped.is_set():
+            return 0
+        full_document = replace(document, title=detail.title, published_at=detail.published_at)
+        self._store.record_document_version(full_document, detail.content_html,ready=False)
+        content_hash = hashlib.sha256(
+            detail.content_html.encode("utf-8")
+        ).hexdigest()
+        if (
+            self._store.get_detail_content_hash(
+                detail.source_id, detail.document_id
+            )
+            == content_hash
+            and self._store.get_detail_parser_version(
+                detail.source_id, detail.document_id
+            )
+            == PARSER_VERSION
+        ):
+            self._store.record_verification_success(detail.source_id,detail.document_id,content_hash)
+            record=self._store.get_event_verification(detail.source_id,detail.document_id)
+            if record and record["error_kind"]=="running":
+                self._store.record_verification_attempt(detail.source_id,detail.document_id,error="当前正文没有可核实的活动时间",error_kind="parse_zero")
+            self._store.finish_article_observation(document.source_id,document.document_id)
+            return 0
+        parsed_candidates = parse_event_candidates(
+            source_id=detail.source_id,
+            document_id=detail.document_id,
+            title=detail.title,
+            content_text=detail.content_text,
+        )
+        candidates = tuple(classify_event_candidate(item) for item in parsed_candidates)
+        self._store.record_china_detail_success(detail, candidates, PARSER_VERSION)
+        return len(candidates)
+
     def render_refresh(self, result: ChinaDetailRefreshResult) -> str:
         lines = [
             "国服活动解析",
@@ -607,7 +675,7 @@ class ChinaNewsDetailService:
                 )
             if len(result.failures) > 3:
                 lines.append(f"另有 {len(result.failures) - 3} 篇失败详情未显示。")
-        lines.append("候选仅供核验，尚未创建提醒或自动推送。")
+        lines.append("本次刷新更新来源与候选；已启用策略由独立调度和投递账本处理。")
         return "\n".join(lines)
 
     def render_candidates(self) -> str:
@@ -660,8 +728,7 @@ def _category_term(entry: ElementTree.Element) -> str | None:
 
 
 def _error_summary(error: Exception) -> str:
-    text = f"{type(error).__name__}: {error}".replace("\n", " ").strip()
-    return text[:300]
+    return safe_reason(f"{type(error).__name__}: {error}")
 
 
 def _retryable_status(status_code: int) -> bool:
