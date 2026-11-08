@@ -107,6 +107,7 @@ FFXIVBot 是一个面向少量指定 QQ 群的 FF14 信息助手：主动整理�
 - 当前 QQ 接入是既有 NapCat 提供的 OneBot 11 WebSocket Server。
 - 当前 QQ 接入已经统一为独立 Python 应用内的本地 NoneBot2 + OneBot V11 薄网关。迁移和清理记录见 [`MIGRATION.md`](MIGRATION.md)。
 - 当前部署由一个进程同时承载 NoneBot、WebUI、Core、来源轮询、活动摘要和维护提醒调度；Windows/Linux 启动命令见 [`UV-USAGE.md`](UV-USAGE.md)。
+- 部署平台决定（2026-11-06）：在 Linux 开发，实际部署到 Windows 服务器；目标平台操作与待验收边界见 [`WINDOWS-DEPLOYMENT.md`](WINDOWS-DEPLOYMENT.md)。
 - NoneBot 只负责连接、事件、平台 API 与消息发送；新闻、活动、市场、权限、调度和存储仍属于 FFXIVBot Core。
 - 已注册 QQ 官方机器人个人开发者账号，但当前不实现官方 Bot。它只保留为未来接入选项，不能影响当前里程碑。
 - NapCat 个人号自动化属于非官方 QQ 接入方式，存在平台限制或封号风险。系统不承诺消除该风险，也不实现规避风控的行为。

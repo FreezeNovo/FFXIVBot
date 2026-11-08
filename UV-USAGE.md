@@ -2,7 +2,7 @@
 
 状态：当前 NoneBot2 应用运行说明，更新于 2026-11-05。当前代码版本为 `0.3.0`，发行限制见 [`CHANGELOG.md`](CHANGELOG.md)，恢复开发核查见 [`TODO.md`](TODO.md)。
 
-虚拟环境由 UV 按 `pyproject.toml` 和 `uv.lock` 管理。2026-11-02 起，后续开发、测试和运行以 Linux 的 `.venv-linux` 为准；继续使用当前工作区目录。Windows `.venv` 和旧启动脚本保留作历史兼容，本次不删除或覆盖。两个环境均不进入版本控制。
+虚拟环境由 UV 按 `pyproject.toml` 和 `uv.lock` 管理。2026-11-02 起，当前工作区开发与离线基线检查使用 Linux `.venv-linux`。2026-11-06 确认实际部署目标为 Windows 服务器，按 [`WINDOWS-DEPLOYMENT.md`](WINDOWS-DEPLOYMENT.md) 在目标机器独立重建 `.venv`；当前工作区的旧 Windows 环境不删除或覆盖，也不能视为可用部署环境。两个环境均不进入版本控制，不能跨平台复制。
 
 ## Linux 前置条件与环境恢复
 
@@ -25,16 +25,20 @@ Linux 下运行 `uv sync` / `uv run` 时显式指定 `UV_PROJECT_ENVIRONMENT=.ve
 
 日常离线校验统一执行 `bash scripts/check-linux.sh`，包含锁文件检查、依赖兼容检查和完整测试。脚本固定使用 `.venv-linux`，不启动应用。直接运行 Python 时使用 `.venv-linux/bin/python`；启动使用 `bash scripts/start-nonebot-dev.sh`。
 
-## Windows 历史兼容命令（非当前开发入口）
+## Windows 服务器环境与检查
+
+解压部署包可普通双击 `Start-FFXIVBot.cmd`，自动安装当前用户范围的 uv/Python 和锁定依赖，执行检查并在确认后启动。`Start-FFXIVBot.cmd -CheckOnly` 只准备环境和验证，不启动业务任务。配置、按需 UAC 与备份预演见 [快速开始](WINDOWS-QUICKSTART.md)；打包命令为 `.venv-linux/bin/python scripts/build-windows-package.py --output /tmp/FFXIVBot-0.3.0-windows.zip`，输出须尚不存在，不打包本地状态。
+
+安装、环境重建、完整离线检查及开机自启见 [`WINDOWS-DEPLOYMENT.md`](WINDOWS-DEPLOYMENT.md)。以下命令在服务器项目根目录执行，当前 Linux 开发入口保持不变；Windows 实机结果仍待验收：
 
 ```powershell
-.\.venv\Scripts\uv.exe lock
+$env:UV_PROJECT_ENVIRONMENT = '.venv'
 .\.venv\Scripts\uv.exe lock --check
-.\.venv\Scripts\uv.exe pip check
-.\.venv\Scripts\uv.exe run --locked python -m unittest discover -s tests -v
+.\.venv\Scripts\uv.exe pip check --python .\.venv\Scripts\python.exe
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-修改 `pyproject.toml` 后执行：
+开发中有意修改 `pyproject.toml` 后才更新锁文件；生产部署仅同步已有锁文件，不执行 `lock` 更新版本：
 
 ```powershell
 .\.venv\Scripts\uv.exe lock
@@ -91,7 +95,7 @@ P3结构化诊断同时输出控制台和 `data/logs/p3.log`，标准库轮转�
 
 将 `.env.example` 复制为被忽略的本机 `.env`，填写 NapCat 正向 WebSocket 地址和 token 后运行。Bot 所有者与服务群白名单在 WebUI 的“群授权”页面管理：
 
-已有 `.env` 时保留它，在本机检查连接地址是否仍可从 Linux 访问；不要在日志或提交中复制其值。
+已有 `.env` 时保留它，在目标机器检查连接地址是否仍可访问；不要在日志或提交中复制其值。
 
 Linux：
 

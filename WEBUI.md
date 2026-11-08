@@ -42,7 +42,9 @@
 
 ## 启动
 
-先按 [`UV-USAGE.md`](UV-USAGE.md) 同步对应平台环境并启动统一入口。当前 Linux 使用 `bash scripts/start-nonebot-dev.sh`；Windows 脚本仅保留作历史兼容。
+先按 [`UV-USAGE.md`](UV-USAGE.md) 同步对应平台环境并启动统一入口。Linux 开发使用 `bash scripts/start-nonebot-dev.sh`；Windows 服务器部署使用 `scripts/start-nonebot-dev.ps1`，环境重建、开机自启与验收见 [`WINDOWS-DEPLOYMENT.md`](WINDOWS-DEPLOYMENT.md)。
+
+Windows 解压包可直接使用根目录 `Start-FFXIVBot.cmd` 自动准备环境后启动同一应用，见 [快速开始](WINDOWS-QUICKSTART.md)。
 
 浏览器打开：
 

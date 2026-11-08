@@ -38,13 +38,21 @@ async def smoke():
     assert not BACKGROUND_TASKS
     APPLICATION.store.validate_integrity()
     assert APPLICATION.store.get_meta('schema_version') == '22'
-with patch('socket.socket.connect', side_effect=AssertionError('No external network')):
-    asyncio.run(smoke())
+# Windows constructs its event-loop wakeup socket via a local connection.
+# Construct that loop before blocking application network calls.
+with asyncio.Runner() as runner:
+    runner.get_loop()
+    with patch('socket.socket.connect', side_effect=AssertionError('No external network')):
+        runner.run(smoke())
 print('schema22 lifecycle, loopback binding, 8 WebUI routes, shutdown and integrity: PASS')
 '''
         with tempfile.TemporaryDirectory() as directory:
+            # Windows needs its system/temp directories; never inherit bot config.
+            environment = {key: os.environ[key] for key in
+                ('PATH', 'SYSTEMROOT', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP') if key in os.environ}
+            environment.update({'PYTHONPATH': str(root), 'LANG': 'C.UTF-8',
+                'PYTHONUTF8': '1', 'PYTHONIOENCODING': 'utf-8',
+                'HOST': '0.0.0.0', 'DRIVER': '~fastapi+~websockets', 'ONEBOT_V11_WS_URLS': '[]'})
             result = subprocess.run([sys.executable, '-c', code], cwd=directory,
-                env={'PATH': os.environ['PATH'], 'PYTHONPATH': str(root), 'LANG': 'C.UTF-8',
-                     'HOST': '0.0.0.0', 'DRIVER': '~fastapi+~websockets', 'ONEBOT_V11_WS_URLS': '[]'},
-                capture_output=True, text=True, timeout=30)
+                env=environment, capture_output=True, text=True, encoding='utf-8', timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

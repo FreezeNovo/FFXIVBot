@@ -121,13 +121,13 @@
 - 权限测试至少覆盖 Bot 所有者、已启用群普通成员、未启用群和私聊。
 - 测试断言用户可见行为和稳定领域契约，避免绑定框架内部实现。
 
-当前开发与验收平台为 Linux，使用 `.venv-linux`。基础校验命令：
+当前开发与离线基线验收平台为 Linux，使用 `.venv-linux`；实际部署目标为 Windows 服务器（2026-11-06 用户确认），部署步骤与 Windows 待验收项见 [`WINDOWS-DEPLOYMENT.md`](WINDOWS-DEPLOYMENT.md)。基础校验命令：
 
 ```bash
 bash scripts/check-linux.sh
 ```
 
-安装/更新依赖、运行 Python 或启动应用前，遵守 [`UV-USAGE.md`](UV-USAGE.md#linux-前置条件与环境恢复) 的 Linux 环境选择规则。Windows `.venv` 仅保留作历史环境，不作为当前执行或验收入口。更换依赖和入口后必须同步更新该运行文档。
+安装/更新依赖、运行 Python 或启动应用前，遵守 [`UV-USAGE.md`](UV-USAGE.md) 的对应平台环境选择规则。当前 Linux 工作区中的旧 Windows `.venv` 仅保留作历史环境，不能作为可用部署环境；Windows 服务器须按部署指南独立重建 `.venv` 并完成目标平台验收。更换依赖和入口后必须同步更新该运行文档。
 
 ## 文档维护规则
 
