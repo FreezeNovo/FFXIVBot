@@ -1,16 +1,17 @@
 # FFXIVBot 实施清单
 
-状态基准：2026-11-05 P3任务01–11及复审修复13已完成；任务12已按用户授权完成受控真实验收，8条消息经provider读回及群客户端确认；实测发现的Topics标题缺陷已修复，完整137项离线测试通过。正式库仍为schema16，正式部署与长期运行未验收。2026-11-05追加国服实时采集到真实投递全链路验收通过，当前代码版本为 `0.3.0`，正式环境尚未部署。这里仅记录已验证事实和下一步工作；产品目标见 [`GOAL.md`](GOAL.md)，开发与验收规则见 [`AGENTS.md`](AGENTS.md)，当前发行记录见 [`CHANGELOG.md`](CHANGELOG.md)。
+当前运行状态（2026-11-09）：用户已在Windows部署 `0.3.0`，运行库schema22；首次只读运行检查已完成，存在单篇国服正文缺Content告警，长期运行和本次部署实际群投递尚未验收，见 [运行检查](.scratch/windows-deployment/runtime-status-2026-11-09.md)。历史实施基线：2026-11-05 P3任务01–11及复审修复13已完成；任务12已按用户授权完成受控真实验收，8条消息经provider读回及群客户端确认，Topics标题缺陷已修复，完整137项离线测试通过；随后国服实时采集到真实投递全链路验收通过。历史记录中的schema16指当时的Linux既有库，不代表当前Windows运行库。这里仅记录已验证事实和下一步工作；产品目标见 [`GOAL.md`](GOAL.md)，开发与验收规则见 [`AGENTS.md`](AGENTS.md)，当前发行记录见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 当前发行基线
 
+- 2026-11-09 Windows实际部署已运行，回环WebUI/healthz正常、已有NapCat连接，provider只读get_status为online/good，SQLite22完整性与外键通过，三类新闻列表抓取成功；1篇国服正文缺Content且尚无成功核实，未生成该篇活动，需后续单独排查。1个群启用国服20:00摘要和维护提醒，新公告关闭，账本暂无投递候选；未重启或试发，不将本次检查等同于群收件与长期验收，见 [报告](.scratch/windows-deployment/runtime-status-2026-11-09.md)。
 - 2026-11-09 已将源码托管到 [`FreezeNovo/FFXIVBot`](https://github.com/FreezeNovo/FFXIVBot)：本机GitHub登录完成，`main`与原始提交历史、`v0.3.0`注解标签已推送，本地`main`跟踪`origin/main`；入口见 [仓库首页](README.md)。当前文件与历史敏感信息检查未发现匹配；锁文件、依赖兼容检查通过，工作区和仅含已提交文件的干净副本均完成148项离线测试（147项成功、1项Windows专属跳过）。迁移期间新增的未提交Windows修复保留在本地，未纳入本次已验证提交。按用户决定暂不配置云端开发平台；本地连接配置、业务数据库、日志、虚拟环境与构建产物不上传，未启动正式应用。
-- 2026-11-09 Windows实机部署阻塞已定位，见 [只读诊断](.scratch/windows-deployment/diagnosis-2026-11-09.md)：实际Python3.14.7可执行，但uv的`cpython-3.14`目录联接被系统以不受信任装入点拒绝（os448），引用该联接的`.venv`报trampoline os2。需修复启动器选择真实解释器路径并保留重建环境；尚未实施。目标无`.env`、业务数据库或应用日志；未修改远端安装、权限或启动应用，Windows部署仍未验收。
+- 2026-11-09 Windows首次只读检查发现uv目录联接os448、虚拟环境trampoline os2，见 [诊断](.scratch/windows-deployment/diagnosis-2026-11-09.md)。随后收到网关测试空输出拼接与Windows缺少tzset的控制台错误，现已修复并在目标LTSC独立临时目录通过`-CheckOnly`与151项测试，见 [修复验收](.scratch/windows-deployment/fix-validation-2026-11-09.md)。原部署目录、连接配置和业务状态未被覆盖，未启动Bot；正式上线、UAC及长期运行仍未验收。
 - 2026-11-06 用户确认 Linux 开发、Windows 服务器部署；已按当前代码核对并补充 [Windows 部署指南](WINDOWS-DEPLOYMENT.md)。本次仅文档变更，未重建旧 Windows 环境、未启动应用或迁移正式库；Windows 原生依赖安装、全套测试、系统锁、开机自启、恢复及长期运行仍待目标服务器实测。
 - 2026-11-08 增加 [解压部署包及快速开始](WINDOWS-QUICKSTART.md)：`Start-FFXIVBot.cmd` / `scripts/start-windows.ps1` 自动安装当前用户范围的固定 uv、Python 3.14及锁定依赖；串行安装和运行锁保护，失败即停，只读验证配置，旧库先备份/副本预演，输入 `START` 后才加载网关。UAC仅按需修复原用户对解压目录的权限，不提权安装器或Bot。`scripts/build-windows-package.py` 用允许清单生成不含本地状态的ZIP与SHA256清单。新增10项Linux可执行自动测试，另有1项Windows专属.NET/msvcrt锁互操作测试；生命周期测试保留Windows必要环境并在网络拦截前创建事件循环。Windows安装/UAC和真实部署仍未实测；本轮未启动正式应用、未迁移正式库或发送消息。
 - 本轮验证：`UV_CACHE_DIR=/tmp/ffxivbot-uv-cache bash scripts/check-linux.sh` 锁文件与30包兼容检查通过，148项测试中147项通过、1项Windows专属测试跳过（Linux Python 3.14.9）。受限执行环境的asyncio跨线程唤醒曾停滞，检查在获准的隔离限制外离线运行后通过；未以此修改业务实现。Microsoft官方便携PowerShell 7.4.6在Linux上完成启动脚本解析、native退出码、空格/中文/单引号路径和写入探针清理检查；这些不替代Windows PowerShell 5.1与UAC实测。
 - 当前代码版本：`0.3.0`（2026-11-05），包含P3、任务13修复及此前可靠性修改；`0.2.0`为历史发行基线。
-- 代码schema为`22`；正式本机数据库仍为`16`，未升级或留下常规运行实例，升级行为见 [`UV-USAGE.md`](UV-USAGE.md#p3-schema-22-升级与恢复)。
+- 代码schema为`22`，当前Windows运行库已实测为`22`；既有Linux库的schema16升级历史见下方记录，本轮未操作该库。升级行为见 [`UV-USAGE.md`](UV-USAGE.md#p3-schema-22-升级与恢复)。
 - 国服实时列表20篇→详情正文→机械版本→群策略→公告候选→持久attempt→真实投递/读回→人工确认已通过，1条消息且重复tick/服务重建均不重发，见 [全链路报告](.scratch/p3-news-and-global/cn-end-to-end-acceptance.md)。采用隔离库受控回放，正常新订阅不补历史也已验证。
 
 ## 工程技能配置

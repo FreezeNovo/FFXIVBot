@@ -1,6 +1,6 @@
 # Windows 服务器部署指南
 
-状态：2026-11-06，适用于当前 `0.3.0` / schema `22`。开发与离线基线在 Linux；实际部署目标为 Windows 服务器。本指南已按当前入口和配置核对，Windows 实机安装、系统锁、开机自启及长期运行仍待在目标服务器验收。
+状态：2026-11-09，适用于当前 `0.3.0` / schema `22`。开发与离线基线在 Linux；实际部署目标为 Windows 服务器。目标 LTSC 临时目录的依赖同步、完整离线测试和系统锁已实测；首次工具下载、UAC、真实应用启动、开机自启及长期运行仍待验收，详见 [快速开始](WINDOWS-QUICKSTART.md)。
 
 本文只提供操作步骤，不表示已授权执行生产迁移或真实群发送。当前实现与历史验收见 [TODO.md](TODO.md)，迁移语义见 [UV-USAGE.md](UV-USAGE.md#p3-schema-22-升级与恢复)，功能管理见 [WEBUI.md](WEBUI.md)。
 
@@ -36,14 +36,14 @@ Set-Location 'C:\Apps\FFXIVBot'
 $ErrorActionPreference = 'Stop'
 $env:UV_PROJECT_ENVIRONMENT = '.venv'
 uv --version
-uv python install 3.14
+uv python install 3.14.7
 if ($LASTEXITCODE -ne 0) { throw 'Python 安装失败' }
-uv sync --locked --python 3.14
+uv sync --locked --python 3.14.7
 if ($LASTEXITCODE -ne 0) { throw '依赖安装失败' }
 .\.venv\Scripts\python.exe --version
 ```
 
-项目声明 Python `>=3.12`，Linux 当前验证的是 `3.14.8`；这里选 `3.14` 作为 Windows 部署候选，uv 会选择该系列可用版本，**不能据此声称 Windows 已兼容验证**。安装后记录实际 Python/uv 版本，并完成下一节全套检查；后续升级尽量沿用验收过的解释器。指定 Python 的安装行为见 [uv 官方说明](https://docs.astral.sh/uv/guides/install-python/)（2026-11-06 核验）。
+项目声明 Python `>=3.12`；这里使用2026-11-09在目标LTSC完成离线检查的 `3.14.7` 作为手动操作示例。升级时显式选择并记录新的完整补丁版本，然后重新完成下一节检查；不要改回仅指定 `3.14`，否则uv可能使用本机拒绝访问的minor版本联接。自动启动器会从本机实际安装目录探测完整版本，无需将示例版本固化为产品要求。指定 Python 的安装行为见 [uv 官方说明](https://docs.astral.sh/uv/guides/install-python/)（2026-11-09核验）。
 
 使用默认开发依赖组是为了安装锁定的 `uv==0.12.4`，供后续检查；不要执行 `uv lock` 更新生产锁文件，也不要在应用运行期间同步依赖。
 
@@ -172,6 +172,7 @@ if ($LASTEXITCODE -ne 0) { throw '恢复库校验失败' }
 | 现象 | 先检查 |
 | --- | --- |
 | 找不到 Python 或入口无法运行 | 是否复制了旧 `.venv`、移动了解释器；用运行账户在服务器重新建立环境。 |
+| uv trampoline os2，或Python联接被报不受信任装入点os448 | 使用2026-11-09修正版启动器，自动从实际版本目录探测解释器、显式请求完整补丁版本；保留旧环境后重建，不关闭系统安全保护。 |
 | 提示无法取得运行锁 | 查找同目录已有实例和计划任务；不要删除锁文件绕过。另一个目录的重复实例需单独检查。 |
 | WebUI 无法打开 | 是否在服务器本机浏览器访问；进程是否仍在；20036 是否被占用；是否存在覆盖端口的环境变量。不要改成 `0.0.0.0` 排错。 |
 | WebUI 正常但 QQ 离线 | 检查既有 NapCat 在线状态、正向 WS 地址/token和网络可达性；不要把token贴到工单。 |

@@ -117,18 +117,22 @@ class NAFreshnessTests(unittest.TestCase):
         self.assertEqual(self.store.get_time_evidence(version.version_id)[0]['precision'],'day')
 
     def test_display_is_beijing_even_with_other_host_timezone(self):
-        import os,time
+        from zoneinfo import ZoneInfo
         self.refresh()
-        original=os.environ.get('TZ')
-        try:
-            os.environ['TZ']='Pacific/Honolulu';time.tzset()
-            text=ActivityDigestWorkflow(self.store,CalendarQueryService(self.store)).preview(self.target,now=NOW)
-            self.assertIn('北京时间',text)
-            self.assertIn('2026/11/12 18:00',text)
-        finally:
-            if original is None:os.environ.pop('TZ',None)
-            else:os.environ['TZ']=original
-            time.tzset()
+        foreign_zone = ZoneInfo('Pacific/Honolulu')
+
+        class ForeignHostDatetime(datetime):
+            # Model a foreign host's implicit timezone conversion on every OS.
+            # A renderer that accidentally uses astimezone() must show Honolulu
+            # and fail the Beijing expectation, without changing the OS timezone.
+            def astimezone(self, tz=None):
+                return super().astimezone(foreign_zone if tz is None else tz)
+
+        with patch('ff14_core.calendar.datetime', ForeignHostDatetime):
+            text=ActivityDigestWorkflow(self.store,CalendarQueryService(self.store)).preview(
+                self.target,now=NOW.astimezone(foreign_zone))
+        self.assertIn('北京时间',text)
+        self.assertIn('2026/11/12 18:00',text)
 
     def test_detail_304_requires_corresponding_validator_and_refreshes_only_its_event(self):
         class ConditionalTransport:

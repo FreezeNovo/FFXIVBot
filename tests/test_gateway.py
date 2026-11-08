@@ -72,11 +72,17 @@ async def run():
     assert sent.success and sent.provider_message_id == '42'
     assert not isinstance(bot.messages[-1], str)
     assert Message(bot.messages[-1]).extract_plain_text() == literal
-with patch('socket.socket.connect', side_effect=AssertionError('No external network')):
-    asyncio.run(run())
+with asyncio.Runner() as runner:
+    # Windows may create an internal wakeup socket when constructing its loop.
+    runner.get_loop()
+    with patch('socket.socket.connect', side_effect=AssertionError('No external network')):
+        runner.run(run())
 '''
         with tempfile.TemporaryDirectory() as tmp:
-            environment = {'PATH': os.environ['PATH'], 'PYTHONPATH': str(root), 'LANG':'C.UTF-8'}
+            environment = {key: os.environ[key] for key in
+                ('PATH', 'SYSTEMROOT', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP') if key in os.environ}
+            environment.update({'PYTHONPATH': str(root), 'LANG': 'C.UTF-8',
+                'PYTHONUTF8': '1', 'PYTHONIOENCODING': 'utf-8', 'ONEBOT_V11_WS_URLS': '[]'})
             result = subprocess.run([sys.executable, '-c', code], cwd=tmp, env=environment,
-                                    capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                                    capture_output=True, text=True, encoding='utf-8', timeout=30)
+        self.assertEqual(result.returncode, 0, (result.stdout or '') + (result.stderr or ''))

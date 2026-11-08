@@ -23,6 +23,27 @@ function Test-WorkspaceWrite {
     Remove-Item -LiteralPath $probe -Force
 }
 
+function Find-ManagedPython {
+    param([string]$InstallDirectory)
+    if (-not (Test-Path -LiteralPath $InstallDirectory)) { return $null }
+    $architecture = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'aarch64' } else { 'x86_64' }
+    $pattern = '^cpython-(3\.14\.\d+)-windows-' + $architecture + '-none$'
+    # Never use uv's cpython-3.14 Junction: LTSC can reject it with os448.
+    $candidates = Get-ChildItem -LiteralPath $InstallDirectory -Directory | Where-Object {
+        $_.Name -match $pattern -and ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0
+    } | Sort-Object { [version]([regex]::Match($_.Name, $pattern).Groups[1].Value) } -Descending
+    foreach ($candidate in $candidates) {
+        $executable = Join-Path $candidate.FullName 'python.exe'
+        if (-not (Test-Path -LiteralPath $executable)) { continue }
+        try {
+            & $executable -c 'import sys; raise SystemExit(sys.version_info[:2] != (3,14))' 2>$null
+            if ($LASTEXITCODE -eq 0) { return $executable }
+        }
+        catch { continue }
+    }
+    return $null
+}
+
 function Enable-WorkspaceWrite {
     try { Test-WorkspaceWrite; return }
     catch [System.UnauthorizedAccessException] {
@@ -91,14 +112,24 @@ try {
     $env:PYTHONUTF8 = '1'
     $env:PYTHONIOENCODING = 'utf-8'
     $env:PYTHONPATH = $workspaceRoot
-    Invoke-Checked $uv @('python', 'install', '3.14')
+    $managedPython = Find-ManagedPython $env:UV_PYTHON_INSTALL_DIR
+    if (-not $managedPython) {
+        Invoke-Checked $uv @('python', 'install', '3.14')
+        $managedPython = Find-ManagedPython $env:UV_PYTHON_INSTALL_DIR
+    }
+    if (-not $managedPython) { throw 'No working Python 3.14 version directory found after installation.' }
+    $managedFolder = Split-Path -Leaf (Split-Path -Parent $managedPython)
+    $managedVersion = [regex]::Match($managedFolder, '^cpython-(3\.14\.\d+)-').Groups[1].Value
+    if (-not $managedVersion) { throw 'Could not determine the installed Python patch version.' }
+    # uv normalizes even absolute executable paths to its minor-version Junction.
+    # An explicit patch-version request keeps pyvenv.cfg on the real directory.
     # Preserve a moved/broken virtual environment instead of deleting user files.
     $python = Join-Path $workspaceRoot '.venv\Scripts\python.exe'
     if (Test-Path -LiteralPath (Join-Path $workspaceRoot '.venv')) {
         $healthy = $false
         if (Test-Path -LiteralPath $python) {
             try {
-                & $python -c 'import sys; raise SystemExit(sys.version_info[:2] != (3,14))' 2>$null
+                & $python -c "import sys; raise SystemExit('.'.join(map(str,sys.version_info[:3])) != sys.argv[1])" $managedVersion 2>$null
                 $healthy = ($LASTEXITCODE -eq 0)
             }
             catch { $healthy = $false }
@@ -109,8 +140,8 @@ try {
             Write-Host "Previous environment preserved as $oldEnvironment"
         }
     }
-    Invoke-Checked $uv @('sync', '--locked', '--python', '3.14', '--link-mode', 'copy')
-    Invoke-Checked $uv @('lock', '--check', '--offline', '--no-python-downloads')
+    Invoke-Checked $uv @('sync', '--locked', '--python', $managedVersion, '--no-python-downloads', '--link-mode', 'copy')
+    Invoke-Checked $uv @('lock', '--check', '--python', $managedVersion, '--offline', '--no-python-downloads')
     Invoke-Checked $uv @('pip', 'check', '--python', $python)
     Invoke-Checked $python @('-c', "import ssl,sqlite3; from zoneinfo import ZoneInfo; print('Runtime OK:', ZoneInfo('Asia/Shanghai'))")
     Invoke-Checked $python @('-m', 'unittest', 'discover', '-s', 'tests', '-v')

@@ -29,7 +29,7 @@ Linux 下运行 `uv sync` / `uv run` 时显式指定 `UV_PROJECT_ENVIRONMENT=.ve
 
 解压部署包可普通双击 `Start-FFXIVBot.cmd`，自动安装当前用户范围的 uv/Python 和锁定依赖，执行检查并在确认后启动。`Start-FFXIVBot.cmd -CheckOnly` 只准备环境和验证，不启动业务任务。配置、按需 UAC 与备份预演见 [快速开始](WINDOWS-QUICKSTART.md)；打包命令为 `.venv-linux/bin/python scripts/build-windows-package.py --output /tmp/FFXIVBot-0.3.0-windows.zip`，输出须尚不存在，不打包本地状态。
 
-安装、环境重建、完整离线检查及开机自启见 [`WINDOWS-DEPLOYMENT.md`](WINDOWS-DEPLOYMENT.md)。以下命令在服务器项目根目录执行，当前 Linux 开发入口保持不变；Windows 实机结果仍待验收：
+安装、环境重建、完整离线检查及开机自启见 [`WINDOWS-DEPLOYMENT.md`](WINDOWS-DEPLOYMENT.md)。2026-11-09修正版已在目标LTSC临时目录通过依赖同步与151项离线测试；不代表真实应用已上线。启动器使用已探测到的完整Python补丁版本创建环境，避免uv minor版本联接被系统拒绝。以下命令在服务器项目根目录执行，当前 Linux 开发入口保持不变：
 
 ```powershell
 $env:UV_PROJECT_ENVIRONMENT = '.venv'
@@ -75,7 +75,7 @@ Windows 将解释器替换为 `.\.venv\Scripts\python.exe`，其余参数相同�
 
 ## P3 schema 22 升级与恢复
 
-当前0.3.0代码使用 schema `22`，正式环境尚未部署；固定脱敏fixture与真实库的独立副本已验证迁移。2026-11-05任务12在新建隔离验收库完成受控真实消息测试，正式库仍为schema16且未改变，测试连接已关闭，见 [受控报告](.scratch/p3-news-and-global/controlled-acceptance.md)。后续正式升级/启动需另行授权并确认精确数据库、备份、副本预演及消息范围；不要用正常启动代替离线预演。
+当前0.3.0代码使用 schema `22`，2026-11-09用户已在Windows部署，运行库schema22与基本运行状态经 [只读检查](.scratch/windows-deployment/runtime-status-2026-11-09.md)确认；本轮未执行迁移或重启。固定脱敏fixture与真实库的独立副本此前已验证迁移。2026-11-05任务12在新建隔离验收库完成受控真实消息测试，当时Linux既有库仍为schema16且未改变，见 [受控报告](.scratch/p3-news-and-global/controlled-acceptance.md)。其他数据库的升级/启动仍需确认精确目标、备份、副本预演及消息范围；不要用正常启动代替离线预演。
 
 使用上节同一 `ff14_app.migration_preview` 命令，只读复制源库到全新目标后迁移。16→22保留快照、策略、查询授权、已发送窗口、unknown及attempts；区域转换为原单元素集合，公告默认关闭。迁移不填造逐活动核实时间，也不从当前标题伪造历史比较字段；旧活动首次有效复查后才取得主动展示资格。
 
