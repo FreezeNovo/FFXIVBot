@@ -4,7 +4,7 @@
 
 ## 当前发行基线
 
-- 2026-11-09 GitHub 托管迁移准备：目标为 [`FreezeNovo/FFXIVBot`](https://github.com/FreezeNovo/FFXIVBot)，已补充 [仓库首页](README.md)，当前文件与历史敏感信息检查未发现匹配；锁文件、依赖兼容检查及148项离线测试通过（147项成功、1项Windows专属跳过）。按用户决定保留原始提交历史与`v0.3.0`标签，等待本机GitHub登录后推送；暂不配置云端开发平台，不迁移本地业务状态或启动正式应用。
+- 2026-11-09 已将源码托管到 [`FreezeNovo/FFXIVBot`](https://github.com/FreezeNovo/FFXIVBot)：本机GitHub登录完成，`main`与原始提交历史、`v0.3.0`注解标签已推送，本地`main`跟踪`origin/main`；入口见 [仓库首页](README.md)。当前文件与历史敏感信息检查未发现匹配；锁文件、依赖兼容检查通过，工作区和仅含已提交文件的干净副本均完成148项离线测试（147项成功、1项Windows专属跳过）。迁移期间新增的未提交Windows修复保留在本地，未纳入本次已验证提交。按用户决定暂不配置云端开发平台；本地连接配置、业务数据库、日志、虚拟环境与构建产物不上传，未启动正式应用。
 - 2026-11-09 Windows实机部署阻塞已定位，见 [只读诊断](.scratch/windows-deployment/diagnosis-2026-11-09.md)：实际Python3.14.7可执行，但uv的`cpython-3.14`目录联接被系统以不受信任装入点拒绝（os448），引用该联接的`.venv`报trampoline os2。需修复启动器选择真实解释器路径并保留重建环境；尚未实施。目标无`.env`、业务数据库或应用日志；未修改远端安装、权限或启动应用，Windows部署仍未验收。
 - 2026-11-06 用户确认 Linux 开发、Windows 服务器部署；已按当前代码核对并补充 [Windows 部署指南](WINDOWS-DEPLOYMENT.md)。本次仅文档变更，未重建旧 Windows 环境、未启动应用或迁移正式库；Windows 原生依赖安装、全套测试、系统锁、开机自启、恢复及长期运行仍待目标服务器实测。
 - 2026-11-08 增加 [解压部署包及快速开始](WINDOWS-QUICKSTART.md)：`Start-FFXIVBot.cmd` / `scripts/start-windows.ps1` 自动安装当前用户范围的固定 uv、Python 3.14及锁定依赖；串行安装和运行锁保护，失败即停，只读验证配置，旧库先备份/副本预演，输入 `START` 后才加载网关。UAC仅按需修复原用户对解压目录的权限，不提权安装器或Bot。`scripts/build-windows-package.py` 用允许清单生成不含本地状态的ZIP与SHA256清单。新增10项Linux可执行自动测试，另有1项Windows专属.NET/msvcrt锁互操作测试；生命周期测试保留Windows必要环境并在网络拦截前创建事件循环。Windows安装/UAC和真实部署仍未实测；本轮未启动正式应用、未迁移正式库或发送消息。
